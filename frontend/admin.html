@@ -15,8 +15,8 @@
         VOTE Admin
       </a>
       <nav>
-        <a href="/dashboard.html">Dashboard</a>
-        <a href="/admin.html">Admin</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/admin">Admin</a>
         <button class="logout-btn" onclick="logout()">Logout</button>
       </nav>
     </div>
@@ -59,6 +59,7 @@
     <div id="policies-container" class="loading">Loading...</div>
   </main>
 
+  <!-- Update Status/Comment Modal -->
   <div id="modal">
     <div class="modal-content">
       <h3 id="modal-title">Update Policy</h3>
@@ -69,6 +70,26 @@
       <div style="display: flex; gap: 0.75rem;">
         <button class="btn btn-primary" id="modal-confirm">Confirm</button>
         <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal" style="display: none;">
+    <div class="modal-content">
+      <h3>Delete Policy?</h3>
+      <p style="margin-bottom: 1rem; color: var(--muted-foreground);">
+        Are you sure you want to permanently delete this policy?
+      </p>
+      <div style="background: var(--muted); padding: 1rem; border-radius: calc(var(--radius) - 2px); margin-bottom: 1rem;">
+        <strong id="delete-policy-title" style="color: var(--foreground);"></strong>
+      </div>
+      <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 1.5rem;">
+        This action cannot be undone and will delete all associated votes.
+      </p>
+      <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-danger" id="confirm-delete-btn">Delete Policy</button>
       </div>
     </div>
   </div>

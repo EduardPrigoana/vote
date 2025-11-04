@@ -5,7 +5,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   const alertContainer = document.getElementById('alert-container');
   const submitBtn = e.target.querySelector('button[type="submit"]');
 
-  // Clear previous alerts
   alertContainer.innerHTML = '';
   submitBtn.disabled = true;
   submitBtn.textContent = 'Logging in...';
@@ -24,9 +23,9 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
     setTimeout(() => {
       if (data.role === 'admin') {
-        window.location.href = '/admin.html';
+        window.location.href = '/admin';
       } else {
-        window.location.href = '/dashboard.html';
+        window.location.href = '/dashboard';
       }
     }, 1000);
 

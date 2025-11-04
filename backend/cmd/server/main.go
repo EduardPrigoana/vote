@@ -41,8 +41,30 @@ func main() {
 	app.Use(logger.New())
 	app.Use(middleware.CORS(cfg.AllowedOrigins))
 
-	// Serve static files (frontend)
-	app.Static("/", "../frontend")
+	// Serve static assets (CSS, JS, images)
+	app.Static("/css", "../frontend/css")
+	app.Static("/js", "../frontend/js")
+
+	// Serve HTML pages at clean routes
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.SendFile("../frontend/index.html")
+	})
+
+	app.Get("/login", func(c *fiber.Ctx) error {
+		return c.SendFile("../frontend/login.html")
+	})
+
+	app.Get("/dashboard", func(c *fiber.Ctx) error {
+		return c.SendFile("../frontend/dashboard.html")
+	})
+
+	app.Get("/submit", func(c *fiber.Ctx) error {
+		return c.SendFile("../frontend/submit.html")
+	})
+
+	app.Get("/admin", func(c *fiber.Ctx) error {
+		return c.SendFile("../frontend/admin.html")
+	})
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(db, cfg.JWTSecret, int64(cfg.JWTExpiry.Seconds()))
@@ -61,13 +83,14 @@ func main() {
 	protected.Get("/policies", policyHandler.GetPolicies)
 	protected.Post("/policies", policyHandler.CreatePolicy)
 	protected.Post("/votes", voteHandler.CreateVote)
-	protected.Get("/votes/status/:policyId", voteHandler.GetVoteStatus) // ADD THIS LINE
+	protected.Get("/votes/status/:policyId", voteHandler.GetVoteStatus)
 
 	// Admin routes
 	admin := api.Group("/admin", middleware.AuthRequired(cfg.JWTSecret), middleware.AdminRequired())
 	admin.Get("/policies", adminHandler.GetAllPolicies)
 	admin.Post("/policies/:id/status", adminHandler.UpdatePolicyStatus)
 	admin.Post("/policies/:id/comment", adminHandler.AddComment)
+	admin.Delete("/policies/:id", adminHandler.DeletePolicy)
 	admin.Post("/users", adminHandler.CreateUser)
 	admin.Get("/stats", adminHandler.GetStats)
 

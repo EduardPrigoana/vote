@@ -788,3 +788,63 @@ tr:hover {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
 }
+/* Vote Progress Bar */
+.vote-progress {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.vote-progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.vote-progress-label-left {
+  color: var(--foreground);
+}
+
+.vote-progress-label-right {
+  color: var(--foreground);
+}
+
+.vote-progress-bar-container {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: var(--muted);
+  border-radius: 9999px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.vote-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--foreground);
+  transition: width 0.3s ease;
+  border-radius: 9999px;
+}
+
+.vote-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.vote-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.vote-stat-number {
+  font-weight: 600;
+  color: var(--foreground);
+}

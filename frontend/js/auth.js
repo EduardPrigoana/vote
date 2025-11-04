@@ -38,12 +38,12 @@ function isAdmin() {
 
 function logout() {
   clearAuth();
-  window.location.href = '/login.html';
+  window.location.href = '/login';
 }
 
 function requireAuth() {
   if (!isAuthenticated()) {
-    window.location.href = '/login.html';
+    window.location.href = '/login';
     return false;
   }
   return true;
@@ -51,7 +51,7 @@ function requireAuth() {
 
 function requireAdmin() {
   if (!isAuthenticated() || !isAdmin()) {
-    window.location.href = '/dashboard.html';
+    window.location.href = '/dashboard';
     return false;
   }
   return true;
@@ -62,10 +62,8 @@ function getDeviceFingerprint() {
   let fingerprint = localStorage.getItem(DEVICE_ID_KEY);
   
   if (!fingerprint) {
-    // Generate unique fingerprint for this device/browser
     fingerprint = 'dev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     
-    // Add browser info for more uniqueness
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     ctx.textBaseline = 'top';

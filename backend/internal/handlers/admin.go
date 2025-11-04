@@ -20,19 +20,19 @@ func (h *AdminHandler) GetAllPolicies(c *fiber.Ctx) error {
 	status := c.Query("status")
 
 	query := `
-        SELECT 
-            p.id, 
-            p.title, 
-            p.description, 
-            p.status,
-            p.admin_comment,
-            p.submitted_by,
-            p.created_at,
-            COALESCE(SUM(CASE WHEN v.vote_type = 'upvote' THEN 1 ELSE 0 END), 0) as upvotes,
-            COALESCE(SUM(CASE WHEN v.vote_type = 'downvote' THEN 1 ELSE 0 END), 0) as downvotes
-        FROM policies p
-        LEFT JOIN votes v ON p.id = v.policy_id
-    `
+		SELECT 
+			p.id, 
+			p.title, 
+			p.description, 
+			p.status,
+			p.admin_comment,
+			p.submitted_by,
+			p.created_at,
+			COALESCE(SUM(CASE WHEN v.vote_type = 'upvote' THEN 1 ELSE 0 END), 0) as upvotes,
+			COALESCE(SUM(CASE WHEN v.vote_type = 'downvote' THEN 1 ELSE 0 END), 0) as downvotes
+		FROM policies p
+		LEFT JOIN votes v ON p.id = v.policy_id
+	`
 
 	args := []interface{}{}
 	if status != "" {
@@ -98,10 +98,10 @@ func (h *AdminHandler) UpdatePolicyStatus(c *fiber.Ctx) error {
 	}
 
 	result, err := h.DB.DB.Exec(`
-        UPDATE policies 
-        SET status = $1, admin_comment = $2
-        WHERE id = $3
-    `, req.Status, req.Comment, policyID)
+		UPDATE policies 
+		SET status = $1, admin_comment = $2
+		WHERE id = $3
+	`, req.Status, req.Comment, policyID)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
@@ -136,10 +136,10 @@ func (h *AdminHandler) AddComment(c *fiber.Ctx) error {
 	}
 
 	result, err := h.DB.DB.Exec(`
-        UPDATE policies 
-        SET admin_comment = $1
-        WHERE id = $2
-    `, req.Comment, policyID)
+		UPDATE policies 
+		SET admin_comment = $1
+		WHERE id = $2
+	`, req.Comment, policyID)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
@@ -156,6 +156,33 @@ func (h *AdminHandler) AddComment(c *fiber.Ctx) error {
 
 	return c.JSON(models.MessageResponse{
 		Message: "Comment added successfully",
+	})
+}
+
+// DELETE /api/v1/admin/policies/:id
+func (h *AdminHandler) DeletePolicy(c *fiber.Ctx) error {
+	policyID := c.Params("id")
+
+	// Delete policy (CASCADE will handle votes)
+	result, err := h.DB.DB.Exec(`
+		DELETE FROM policies WHERE id = $1
+	`, policyID)
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: "Failed to delete policy",
+		})
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
+			Error: "Policy not found",
+		})
+	}
+
+	return c.JSON(models.MessageResponse{
+		Message: "Policy deleted successfully",
 	})
 }
 
@@ -176,10 +203,10 @@ func (h *AdminHandler) CreateUser(c *fiber.Ctx) error {
 
 	var userID string
 	err := h.DB.DB.QueryRow(`
-        INSERT INTO users (role, login_code, is_active)
-        VALUES ('student', $1, $2)
-        RETURNING id
-    `, req.LoginCode, req.IsActive).Scan(&userID)
+		INSERT INTO users (role, login_code, is_active)
+		VALUES ('student', $1, $2)
+		RETURNING id
+	`, req.LoginCode, req.IsActive).Scan(&userID)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{

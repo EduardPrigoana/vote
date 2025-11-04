@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - VOTE</title>
+  <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <a href="/" class="logo">
+        <img src="https://prigoana.com/favicon.png" alt="Logo">
+        VOTE Admin
+      </a>
+      <nav>
+        <a href="/dashboard.html">Dashboard</a>
+        <a href="/admin.html">Admin</a>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1>Admin Dashboard</h1>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">-</div>
+        <div class="stat-label">Total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-pending">-</div>
+        <div class="stat-label">Pending</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-votes">-</div>
+        <div class="stat-label">Votes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-students">-</div>
+        <div class="stat-label">Classrooms</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <label for="status-filter">Filter</label>
+      <select id="status-filter">
+        <option value="">All</option>
+        <option value="pending" selected>Pending</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="uncertain">Uncertain</option>
+      </select>
+    </div>
+
+    <div id="alert-container"></div>
+    <div id="policies-container" class="loading">Loading...</div>
+  </main>
+
+  <div id="modal">
+    <div class="modal-content">
+      <h3 id="modal-title">Update Policy</h3>
+      <div class="form-group">
+        <label for="admin-comment">Comment (optional)</label>
+        <textarea id="admin-comment" rows="4"></textarea>
+      </div>
+      <div style="display: flex; gap: 0.75rem;">
+        <button class="btn btn-primary" id="modal-confirm">Confirm</button>
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

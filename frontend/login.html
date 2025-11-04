@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - VOTE</title>
+  <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <a href="/" class="logo">
+        <img src="https://prigoana.com/favicon.png" alt="Logo">
+        VOTE
+      </a>
+      <nav>
+        <a href="/">Home</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="login-container">
+      <div class="card login-card">
+        <h2>Login</h2>
+        <p>Enter your classroom code to access the platform.</p>
+
+        <div id="alert-container"></div>
+
+        <form id="login-form">
+          <div class="form-group">
+            <label for="code">Classroom Code</label>
+            <input 
+              type="text" 
+              id="code" 
+              name="code" 
+              placeholder="e.g., DEMO2024" 
+              required 
+              autocomplete="off"
+            >
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%;">
+            Login
+          </button>
+        </form>
+
+        <p style="margin-top: 1.5rem; text-align: center;">
+          <small>Don't have a code? Contact your administrator.</small>
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/login.js"></script>
+</body>
+</html>

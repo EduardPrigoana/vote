@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - VOTE</title>
+  <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <a href="/" class="logo">
+        <img src="https://prigoana.com/favicon.png" alt="Logo">
+        VOTE
+      </a>
+      <nav>
+        <a href="/dashboard.html">Dashboard</a>
+        <a href="/submit.html">Submit</a>
+        <a href="/admin.html" id="admin-link" style="display: none;">Admin</a>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div style="max-width: 900px; margin: 0 auto;">
+      <h1>All Policies</h1>
+      <p>Vote once per device to show your support or opposition.</p>
+
+      <div id="alert-container"></div>
+      <div id="policies-container" class="loading">Loading policies...</div>
+    </div>
+  </main>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

@@ -3,21 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - VOTE</title>
+  <title>Vote - Dashboard</title>
   <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
   <link rel="stylesheet" href="/css/styles.css">
+  
+  <!-- Plausible Analytics -->
+  <script defer data-domain="vote.prigoana.com" src="https://plausible.canine.tools/js/script.hash.outbound-links.pageview-props.tagged-events.js"></script>
+  <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
 <body>
   <header>
     <div class="header-content">
-      <a href="/" class="logo">
-        <img src="https://prigoana.com/favicon.png" alt="Logo">
-        VOTE
-      </a>
+      <a href="/dashboard" class="logo">Vote</a>
       <nav>
-        <a href="/dashboard">Dashboard</a>
+        <a href="/dashboard">Policies</a>
         <a href="/submit">Submit</a>
         <a href="/admin" id="admin-link" style="display: none;">Admin</a>
+        <a href="/superuser" id="superuser-link" style="display: none;">Superuser</a>
         <button class="logout-btn" onclick="logout()">Logout</button>
       </nav>
     </div>
@@ -25,11 +27,55 @@
 
   <main class="container">
     <div style="max-width: 900px; margin: 0 auto;">
-      <h1>All Policies</h1>
-      <p>Vote once per device to show your support or opposition.</p>
+      <div class="page-header">
+        <h1>All Policies</h1>
+        <p>Vote once per device to show your support or opposition.</p>
+      </div>
+
+      <!-- Search & Filter -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: grid; gap: 1rem; grid-template-columns: 1fr;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <input 
+              type="search" 
+              id="search-input" 
+              placeholder="Search policies..."
+              style="width: 100%;"
+            >
+          </div>
+          
+          <div style="display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+            <div class="form-group" style="margin-bottom: 0;">
+              <select id="category-filter">
+                <option value="">All Categories</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <select id="status-filter">
+                <option value="">All Statuses</option>
+                <option value="approved">Approved</option>
+                <option value="uncertain">Uncertain</option>
+                <option value="rejected">Rejected</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <select id="sort-filter">
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="most_voted">Most Voted</option>
+                <option value="trending">Trending</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div id="alert-container"></div>
-      <div id="policies-container" class="loading">Loading policies...</div>
+      <div id="policies-container" class="loading">Loading...</div>
     </div>
   </main>
 

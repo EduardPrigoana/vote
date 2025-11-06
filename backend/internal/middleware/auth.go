@@ -1,9 +1,9 @@
 package middleware
 
 import (
+	"strings"
 	"vote/internal/models"
 	"vote/internal/utils"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -42,9 +42,21 @@ func AuthRequired(jwtSecret string) fiber.Handler {
 func AdminRequired() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		role := c.Locals("role")
-		if role != "admin" {
+		if role != "admin" && role != "superuser" {
 			return c.Status(fiber.StatusForbidden).JSON(models.ErrorResponse{
 				Error: "Admin access required",
+			})
+		}
+		return c.Next()
+	}
+}
+
+func SuperuserRequired() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		role := c.Locals("role")
+		if role != "superuser" {
+			return c.Status(fiber.StatusForbidden).JSON(models.ErrorResponse{
+				Error: "Superuser access required",
 			})
 		}
 		return c.Next()

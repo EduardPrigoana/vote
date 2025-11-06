@@ -21,8 +21,15 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
       <div class="alert alert-success">Login successful! Redirecting...</div>
     `;
 
+    // Track with Plausible
+    if (typeof plausible !== 'undefined') {
+      plausible('Login', { props: { role: data.role } });
+    }
+
     setTimeout(() => {
-      if (data.role === 'admin') {
+      if (data.role === 'superuser') {
+        window.location.href = '/superuser';
+      } else if (data.role === 'admin') {
         window.location.href = '/admin';
       } else {
         window.location.href = '/dashboard';
@@ -33,7 +40,13 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     alertContainer.innerHTML = `
       <div class="alert alert-error">${error.message}</div>
     `;
+    
+    // Track with Plausible
+    if (typeof plausible !== 'undefined') {
+      plausible('Login Error');
+    }
+    
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Login';
+    submitBtn.textContent = 'Continue';
   }
 });

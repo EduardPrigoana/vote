@@ -4,22 +4,59 @@ if (isAdmin()) {
   document.getElementById('admin-link').style.display = 'block';
 }
 
+if (isSuperuser()) {
+  document.getElementById('superuser-link').style.display = 'block';
+}
+
 const policiesContainer = document.getElementById('policies-container');
 const alertContainer = document.getElementById('alert-container');
 const voteStatusCache = {};
+let categories = [];
 
-async function loadPolicies() {
+// Load categories
+async function loadCategories() {
   try {
-    const policies = await apiRequest('/policies');
+    categories = await apiRequest('/categories?lang=en');
+    
+    const categoryFilter = document.getElementById('category-filter');
+    categoryFilter.innerHTML = '<option value="">All Categories</option>';
+    
+    categories.forEach(cat => {
+      const option = document.createElement('option');
+      option.value = cat.id;
+      option.textContent = cat.name;
+      categoryFilter.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Failed to load categories:', error);
+  }
+}
+
+// Load policies with filters
+async function loadPolicies() {
+  const search = document.getElementById('search-input')?.value || '';
+  const category = document.getElementById('category-filter')?.value || '';
+  const status = document.getElementById('status-filter')?.value || '';
+  const sort = document.getElementById('sort-filter')?.value || 'newest';
+
+  const params = new URLSearchParams();
+  if (search) params.append('search', search);
+  if (category) params.append('category', category);
+  if (status) params.append('status', status);
+  if (sort) params.append('sort', sort);
+  params.append('lang', 'en');
+
+  try {
+    const policies = await apiRequest(`/policies?${params.toString()}`);
 
     if (policies.length === 0) {
       policiesContainer.innerHTML = `
-  <div class="empty-state">
-    <h3>No policies yet</h3>
-    <p>Be the first to submit a policy idea!</p>
-    <a href="/submit" class="btn btn-primary">Submit Policy</a>
-  </div>
-    `;
+        <div class="empty-state">
+          <h3>No policies found</h3>
+          <p>Try adjusting your filters or be the first to submit a policy!</p>
+          <a href="/submit" class="btn btn-primary">Submit Policy</a>
+        </div>
+      `;
       return;
     }
 
@@ -35,7 +72,6 @@ async function loadPolicies() {
 
     policiesContainer.innerHTML = policies.map(policy => renderPolicyCard(policy)).join('');
     attachVoteHandlers();
-
   } catch (error) {
     policiesContainer.innerHTML = `
       <div class="alert alert-error">
@@ -48,22 +84,21 @@ async function loadPolicies() {
 function renderPolicyCard(policy) {
   const voteStatus = voteStatusCache[policy.id] || { device_has_voted: false };
   const deviceHasVoted = voteStatus.device_has_voted;
-
-  // Calculate vote percentages
-  const upvotes = policy.upvotes || 0;
-  const downvotes = policy.downvotes || 0;
-  const totalVotes = upvotes + downvotes;
-  
-  const upvotePercentage = totalVotes > 0 ? ((upvotes / totalVotes) * 100).toFixed(1) : 0;
-  const downvotePercentage = totalVotes > 0 ? ((downvotes / totalVotes) * 100).toFixed(1) : 0;
+  const totalVotes = (policy.upvotes || 0) + (policy.downvotes || 0);
+  const supportPercentage = totalVotes > 0 ? ((policy.upvotes || 0) / totalVotes * 100).toFixed(1) : 0;
 
   return `
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title">${escapeHtml(policy.title)}</h3>
+        <div style="flex: 1;">
+          <h3 class="card-title">${escapeHtml(policy.title)}</h3>
+          ${policy.category_name ? `<small style="color: var(--muted-foreground);">${escapeHtml(policy.category_name)}</small>` : ''}
+        </div>
         <span class="badge badge-${policy.status}">${policy.status}</span>
       </div>
+      
       <p>${escapeHtml(policy.description)}</p>
+      
       ${policy.admin_comment ? `
         <div class="info-box">
           <strong>Admin:</strong> ${escapeHtml(policy.admin_comment)}
@@ -73,18 +108,18 @@ function renderPolicyCard(policy) {
       ${totalVotes > 0 ? `
         <div class="vote-progress">
           <div class="vote-progress-label">
-            <span class="vote-progress-label-left">Support: ${upvotePercentage}%</span>
-            <span class="vote-progress-label-right">Oppose: ${downvotePercentage}%</span>
+            <span>Support: ${supportPercentage}%</span>
+            <span>Oppose: ${(100 - supportPercentage).toFixed(1)}%</span>
           </div>
           <div class="vote-progress-bar-container">
-            <div class="vote-progress-bar" style="width: ${upvotePercentage}%"></div>
+            <div class="vote-progress-bar" style="width: ${supportPercentage}%"></div>
           </div>
           <div class="vote-stats">
             <span class="vote-stat">
-              <span class="vote-stat-number">${upvotes}</span> upvotes
+              <span class="vote-stat-number">${policy.upvotes || 0}</span> support
             </span>
             <span class="vote-stat">
-              <span class="vote-stat-number">${downvotes}</span> downvotes
+              <span class="vote-stat-number">${policy.downvotes || 0}</span> oppose
             </span>
           </div>
         </div>
@@ -99,25 +134,24 @@ function renderPolicyCard(policy) {
           class="vote-btn upvote" 
           data-policy-id="${policy.id}" 
           data-vote-type="upvote"
-          aria-label="Upvote this policy"
           ${deviceHasVoted ? 'disabled' : ''}
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
           </svg>
-          <span class="vote-count">${upvotes}</span>
+          <span class="vote-count">${policy.upvotes || 0}</span>
         </button>
+        
         <button 
           class="vote-btn downvote" 
           data-policy-id="${policy.id}" 
           data-vote-type="downvote"
-          aria-label="Downvote this policy"
           ${deviceHasVoted ? 'disabled' : ''}
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
-          <span class="vote-count">${downvotes}</span>
+          <span class="vote-count">${policy.downvotes || 0}</span>
         </button>
       </div>
       
@@ -160,6 +194,10 @@ function attachVoteHandlers() {
           alertContainer.innerHTML = '';
         }, 3000);
 
+        if (typeof plausible !== 'undefined') {
+          plausible('Vote', { props: { type: voteType } });
+        }
+
         loadPolicies();
 
       } catch (error) {
@@ -179,10 +217,49 @@ function attachVoteHandlers() {
   });
 }
 
+// Search & filter handlers
+let searchTimeout;
+document.getElementById('search-input')?.addEventListener('input', (e) => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    loadPolicies();
+    
+    if (typeof plausible !== 'undefined' && e.target.value) {
+      plausible('Search', { props: { query: e.target.value } });
+    }
+  }, 500);
+});
+
+document.getElementById('category-filter')?.addEventListener('change', () => {
+  loadPolicies();
+  
+  if (typeof plausible !== 'undefined') {
+    plausible('Filter Category');
+  }
+});
+
+document.getElementById('status-filter')?.addEventListener('change', () => {
+  loadPolicies();
+  
+  if (typeof plausible !== 'undefined') {
+    plausible('Filter Status');
+  }
+});
+
+document.getElementById('sort-filter')?.addEventListener('change', () => {
+  loadPolicies();
+  
+  if (typeof plausible !== 'undefined') {
+    plausible('Change Sort');
+  }
+});
+
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
 
+// Initialize
+loadCategories();
 loadPolicies();

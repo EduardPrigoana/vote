@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Script Test</title>
+</head>
+<body>
+  <h1>Testing Scripts</h1>
+  <button onclick="toggleTheme()">Toggle Theme</button>
+  <button onclick="toggleLanguage()">Toggle Language</button>
+  <div id="theme-toggle">Theme Button</div>
+  <div id="lang-toggle">EN</div>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/theme.js"></script>
+  <script>
+    console.log('getCurrentTheme:', getCurrentTheme());
+    console.log('getCurrentLanguage:', getCurrentLanguage());
+    console.log('toggleTheme function:', typeof window.toggleTheme);
+    console.log('toggleLanguage function:', typeof window.toggleLanguage);
+  </script>
+</body>
+</html>

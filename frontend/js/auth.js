@@ -33,7 +33,12 @@ function isAuthenticated() {
 }
 
 function isAdmin() {
-  return getUserRole() === 'admin';
+  const role = getUserRole();
+  return role === 'admin' || role === 'superuser';
+}
+
+function isSuperuser() {
+  return getUserRole() === 'superuser';
 }
 
 function logout() {
@@ -51,6 +56,14 @@ function requireAuth() {
 
 function requireAdmin() {
   if (!isAuthenticated() || !isAdmin()) {
+    window.location.href = '/dashboard';
+    return false;
+  }
+  return true;
+}
+
+function requireSuperuser() {
+  if (!isAuthenticated() || !isSuperuser()) {
     window.location.href = '/dashboard';
     return false;
   }

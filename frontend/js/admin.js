@@ -1,11 +1,54 @@
 requireAdmin();
 
+if (isSuperuser()) {
+  document.getElementById('superuser-link').style.display = 'block';
+}
+
 const policiesContainer = document.getElementById('policies-container');
 const alertContainer = document.getElementById('alert-container');
 const statusFilter = document.getElementById('status-filter');
 
 let currentPolicyId = null;
 let currentAction = null;
+let policyToDelete = null;
+let selectedPolicies = new Set();
+
+// Language toggle
+window.toggleLanguage = function() {
+  const current = getCurrentLanguage();
+  const newLang = current === 'en' ? 'ro' : 'en';
+  setLanguage(newLang);
+  document.getElementById('lang-toggle').textContent = newLang === 'en' ? 'RO' : 'EN';
+  loadStats();
+  loadPolicies();
+}
+
+// Tab switching
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.style.display = 'none';
+  });
+
+  if (tab === 'policies') {
+    document.getElementById('policies-tab').style.display = 'block';
+  } else if (tab === 'analytics') {
+    document.getElementById('analytics-tab').style.display = 'block';
+    loadAnalytics();
+  } else if (tab === 'audit') {
+    document.getElementById('audit-tab').style.display = 'block';
+    loadAuditLog();
+  }
+
+  // Track with Plausible
+  if (typeof plausible !== 'undefined') {
+    plausible('Admin Tab Switch', { props: { tab: tab } });
+  }
+}
 
 // Load stats
 async function loadStats() {
@@ -41,6 +84,9 @@ async function loadPolicies() {
       <table>
         <thead>
           <tr>
+            <th style="width: 40px;">
+              <input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)">
+            </th>
             <th>Title</th>
             <th>Status</th>
             <th>Votes</th>
@@ -55,6 +101,9 @@ async function loadPolicies() {
             
             return `
               <tr>
+                <td>
+                  <input type="checkbox" class="policy-checkbox" value="${policy.id}" onchange="togglePolicySelection('${policy.id}', this.checked)">
+                </td>
                 <td>
                   <strong>${escapeHtml(policy.title)}</strong><br>
                   <small style="color: var(--muted-foreground);">${escapeHtml(policy.description.substring(0, 100))}...</small>
@@ -88,27 +137,7 @@ async function loadPolicies() {
                 </td>
                 <td>
                   <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    ${policy.status !== 'approved' ? `
-                      <button class="btn btn-success btn-sm" onclick="updateStatus('${policy.id}', 'approved')">
-                        Approve
-                      </button>
-                    ` : ''}
-                    ${policy.status !== 'uncertain' ? `
-                      <button class="btn btn-warning btn-sm" onclick="updateStatus('${policy.id}', 'uncertain')">
-                        Uncertain
-                      </button>
-                    ` : ''}
-                    ${policy.status !== 'rejected' ? `
-                      <button class="btn btn-danger btn-sm" onclick="updateStatus('${policy.id}', 'rejected')">
-                        Reject
-                      </button>
-                    ` : ''}
-                    <button class="btn btn-secondary btn-sm" onclick="addComment('${policy.id}')">
-                      Comment
-                    </button>
-                    <button class="btn btn-danger btn-sm" onclick="confirmDelete('${policy.id}', '${escapeHtml(policy.title)}')">
-                      Delete
-                    </button>
+                    ${renderActionButtons(policy)}
                   </div>
                 </td>
               </tr>
@@ -125,11 +154,292 @@ async function loadPolicies() {
   }
 }
 
+function renderActionButtons(policy) {
+  let buttons = '';
+  
+  if (policy.status !== 'approved') {
+    buttons += `<button class="btn btn-success btn-sm" onclick="updateStatus('${policy.id}', 'approved')">Approve</button>`;
+  }
+  if (policy.status !== 'in_progress' && policy.status === 'approved') {
+    buttons += `<button class="btn btn-secondary btn-sm" onclick="updateStatus('${policy.id}', 'in_progress')">In Progress</button>`;
+  }
+  if (policy.status !== 'completed' && policy.status === 'in_progress') {
+    buttons += `<button class="btn btn-success btn-sm" onclick="updateStatus('${policy.id}', 'completed')">Complete</button>`;
+  }
+  if (policy.status !== 'uncertain') {
+    buttons += `<button class="btn btn-warning btn-sm" onclick="updateStatus('${policy.id}', 'uncertain')">Uncertain</button>`;
+  }
+  if (policy.status !== 'rejected') {
+    buttons += `<button class="btn btn-danger btn-sm" onclick="updateStatus('${policy.id}', 'rejected')">Reject</button>`;
+  }
+  if (policy.status === 'approved' || policy.status === 'in_progress') {
+    buttons += `<button class="btn btn-secondary btn-sm" onclick="updateStatus('${policy.id}', 'on_hold')">Hold</button>`;
+  }
+  if (policy.status === 'approved' || policy.status === 'uncertain') {
+    buttons += `<button class="btn btn-secondary btn-sm" onclick="updateStatus('${policy.id}', 'cannot_implement')">Can't Do</button>`;
+  }
+  
+  buttons += `<button class="btn btn-secondary btn-sm" onclick="addComment('${policy.id}')">Comment</button>`;
+  buttons += `<button class="btn btn-danger btn-sm" onclick="confirmDelete('${policy.id}', '${escapeHtml(policy.title)}')">Delete</button>`;
+  
+  return buttons;
+}
+
+// Selection management
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.policy-checkbox').forEach(checkbox => {
+    checkbox.checked = checked;
+    togglePolicySelection(checkbox.value, checked);
+  });
+}
+
+function togglePolicySelection(policyId, selected) {
+  if (selected) {
+    selectedPolicies.add(policyId);
+  } else {
+    selectedPolicies.delete(policyId);
+  }
+  
+  document.getElementById('bulk-delete-btn').style.display = 
+    selectedPolicies.size > 0 ? 'inline-flex' : 'none';
+}
+
+// Bulk delete
+async function bulkDelete() {
+  if (selectedPolicies.size === 0) return;
+  
+  if (!confirm(`Delete ${selectedPolicies.size} selected policies? This cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    await apiRequest('/admin/policies/bulk', {
+      method: 'POST',
+      body: JSON.stringify({
+        policy_ids: Array.from(selectedPolicies),
+        action: 'delete'
+      })
+    });
+
+    alertContainer.innerHTML = `
+      <div class="alert alert-success">Successfully deleted ${selectedPolicies.size} policies</div>
+    `;
+
+    setTimeout(() => {
+      alertContainer.innerHTML = '';
+    }, 3000);
+
+    selectedPolicies.clear();
+    loadPolicies();
+    loadStats();
+
+    // Track with Plausible
+    if (typeof plausible !== 'undefined') {
+      plausible('Bulk Delete');
+    }
+
+  } catch (error) {
+    alertContainer.innerHTML = `
+      <div class="alert alert-error">${error.message}</div>
+    `;
+  }
+}
+
+async function exportCSV() {
+  const ids = selectedPolicies.size > 0 ? Array.from(selectedPolicies).join(',') : '';
+  const url = `/api/v1/admin/export/csv${ids ? `?ids=${ids}` : ''}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Export failed');
+    }
+    
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `policies_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(downloadUrl);
+    document.body.removeChild(a);
+    
+    // Track with Plausible
+    if (typeof plausible !== 'undefined') {
+      plausible('Export CSV', { props: { selected: selectedPolicies.size } });
+    }
+  } catch (error) {
+    alert('Export failed: ' + error.message);
+  }
+}
+
+async function exportExcel() {
+  const ids = selectedPolicies.size > 0 ? Array.from(selectedPolicies).join(',') : '';
+  const url = `/api/v1/admin/export/xlsx${ids ? `?ids=${ids}` : ''}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Export failed');
+    }
+    
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `policies_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(downloadUrl);
+    document.body.removeChild(a);
+    
+    // Track with Plausible
+    if (typeof plausible !== 'undefined') {
+      plausible('Export Excel', { props: { selected: selectedPolicies.size } });
+    }
+  } catch (error) {
+    alert('Export failed: ' + error.message);
+  }
+}
+
+// *** START OF FIX ***
+// The following 'loadAnalytics' function was missing. The code was in the global
+// scope, causing the "container is not defined" error.
+async function loadAnalytics() {
+  const container = document.getElementById('analytics-tab');
+  container.innerHTML = '<div class="loading">Loading analytics...</div>';
+
+  try {
+    const analytics = await apiRequest('/admin/analytics');
+
+    container.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">${analytics.total_policies}</div>
+          <div class="stat-label">Total Policies</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${analytics.total_votes}</div>
+          <div class="stat-label">Total Votes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${analytics.participation_rate.toFixed(1)}%</div>
+          <div class="stat-label">Participation Rate</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${analytics.policy_success_rate.toFixed(1)}%</div>
+          <div class="stat-label">Policy Success Rate</div>
+        </div>
+      </div>
+
+      <h2 style="margin-top: 2rem; margin-bottom: 1rem;">Top Classrooms</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Classroom Code</th>
+            <th>Votes</th>
+            <th>Policies</th>
+            <th>Engagement Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${analytics.top_classrooms.map(classroom => `
+            <tr>
+              <td><strong>${escapeHtml(classroom.login_code)}</strong></td>
+              <td>${classroom.vote_count}</td>
+              <td>${classroom.policy_count}</td>
+              <td><strong>${classroom.engagement_score}</strong></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <h2 style="margin-top: 2rem; margin-bottom: 1rem;">Category Distribution</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Policies</th>
+            <th>Votes</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${analytics.category_distribution.map(cat => `
+            <tr>
+              <td><strong>${escapeHtml(cat.category_name)}</strong></td>
+              <td>${cat.policy_count}</td>
+              <td>${cat.vote_count}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (error) {
+    container.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+  }
+}
+// *** END OF FIX ***
+
+// Audit Log
+async function loadAuditLog() {
+  const container = document.getElementById('audit-container');
+  container.innerHTML = '<div class="loading">Loading audit log...</div>';
+
+  try {
+    const logs = await apiRequest('/admin/audit-log?limit=100');
+
+    if (logs.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No audit logs yet</p></div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Entity</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${logs.map(log => `
+            <tr>
+              <td><small>${new Date(log.created_at).toLocaleString()}</small></td>
+              <td>${log.user_code || 'System'}</td>
+              <td><code>${log.action}</code></td>
+              <td>${log.entity_type}</td>
+              <td><small>${log.details ? JSON.stringify(log.details) : '-'}</small></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+  } catch (error) {
+    container.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+  }
+}
+
+// Modal functions
 function updateStatus(policyId, status) {
   currentPolicyId = policyId;
   currentAction = status;
   
-  document.getElementById('modal-title').textContent = `${status.charAt(0).toUpperCase() + status.slice(1)} Policy`;
+  document.getElementById('modal-title').textContent = `${status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')} Policy`;
   document.getElementById('admin-comment').value = '';
   document.getElementById('modal').style.display = 'block';
 }
@@ -144,46 +454,13 @@ function addComment(policyId) {
 }
 
 function confirmDelete(policyId, policyTitle) {
-  // Decode HTML entities for display
+  policyToDelete = policyId;
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = policyTitle;
   const decodedTitle = tempDiv.textContent;
   
-  if (confirm(`Are you sure you want to permanently delete this policy?\n\n"${decodedTitle}"\n\nThis action cannot be undone and will delete all associated votes.`)) {
-    deletePolicy(policyId);
-  }
-}
-
-async function deletePolicy(policyId) {
-  try {
-    await apiRequest(`/admin/policies/${policyId}`, {
-      method: 'DELETE',
-    });
-
-    alertContainer.innerHTML = `
-      <div class="alert alert-success">
-        <strong>Success!</strong> Policy deleted successfully.
-      </div>
-    `;
-
-    setTimeout(() => {
-      alertContainer.innerHTML = '';
-    }, 3000);
-
-    loadPolicies();
-    loadStats();
-
-  } catch (error) {
-    alertContainer.innerHTML = `
-      <div class="alert alert-error">
-        <strong>Error:</strong> ${error.message}
-      </div>
-    `;
-    
-    setTimeout(() => {
-      alertContainer.innerHTML = '';
-    }, 5000);
-  }
+  document.getElementById('delete-policy-title').textContent = decodedTitle;
+  document.getElementById('delete-modal').style.display = 'block';
 }
 
 function closeModal() {
@@ -192,20 +469,21 @@ function closeModal() {
   currentAction = null;
 }
 
+function closeDeleteModal() {
+  document.getElementById('delete-modal').style.display = 'none';
+  policyToDelete = null;
+}
+
 document.getElementById('modal-confirm').addEventListener('click', async () => {
   const comment = document.getElementById('admin-comment').value.trim();
 
   try {
     if (currentAction === 'comment') {
-      // Just add/update comment without changing status
       await apiRequest(`/admin/policies/${currentPolicyId}/comment`, {
         method: 'POST',
-        body: JSON.stringify({
-          comment: comment || null,
-        }),
+        body: JSON.stringify({ comment: comment || null }),
       });
     } else {
-      // Update status with optional comment
       await apiRequest(`/admin/policies/${currentPolicyId}/status`, {
         method: 'POST',
         body: JSON.stringify({
@@ -229,12 +507,50 @@ document.getElementById('modal-confirm').addEventListener('click', async () => {
     loadPolicies();
     loadStats();
 
+    // Track with Plausible
+    if (typeof plausible !== 'undefined') {
+      plausible('Admin Action', { props: { action: currentAction } });
+    }
+
   } catch (error) {
     alertContainer.innerHTML = `
       <div class="alert alert-error">
         <strong>Error:</strong> ${error.message}
       </div>
     `;
+  }
+});
+
+document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+  if (!policyToDelete) return;
+
+  try {
+    await apiRequest(`/admin/policies/${policyToDelete}`, {
+      method: 'DELETE',
+    });
+
+    alertContainer.innerHTML = `
+      <div class="alert alert-success">Policy deleted successfully.</div>
+    `;
+
+    setTimeout(() => {
+      alertContainer.innerHTML = '';
+    }, 3000);
+
+    closeDeleteModal();
+    loadPolicies();
+    loadStats();
+
+    // Track with Plausible
+    if (typeof plausible !== 'undefined') {
+      plausible('Delete Policy');
+    }
+
+  } catch (error) {
+    alertContainer.innerHTML = `
+      <div class="alert alert-error">${error.message}</div>
+    `;
+    closeDeleteModal();
   }
 });
 
@@ -246,5 +562,7 @@ function escapeHtml(text) {
 
 statusFilter.addEventListener('change', loadPolicies);
 
+// Initial loads
 loadStats();
 loadPolicies();
+

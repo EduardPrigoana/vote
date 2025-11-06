@@ -3,51 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - VOTE</title>
+  <title>Vote - Login</title>
   <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
   <link rel="stylesheet" href="/css/styles.css">
+  
+  <!-- Plausible Analytics -->
+  <script defer data-domain="vote.prigoana.com" src="https://plausible.canine.tools/js/script.hash.outbound-links.pageview-props.tagged-events.js"></script>
+  <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
 <body>
-  <header>
-    <div class="header-content">
-      <a href="/" class="logo">
-        <img src="https://prigoana.com/favicon.png" alt="Logo">
-        VOTE
-      </a>
-      <nav>
-        <a href="/">Home</a>
-      </nav>
-    </div>
-  </header>
-
   <main>
     <div class="login-container">
-      <div class="card login-card">
-        <h2>Login</h2>
-        <p>Enter your classroom code to access the platform.</p>
+      <div class="login-card">
+        <div class="login-header">
+          <h1>Vote</h1>
+          <p>Student Policy Platform</p>
+        </div>
 
-        <div id="alert-container"></div>
+        <div class="card">
+          <h2>Login</h2>
+          <p style="margin-bottom: 1.5rem;">Enter your classroom code to get started.</p>
 
-        <form id="login-form">
-          <div class="form-group">
-            <label for="code">Classroom Code</label>
-            <input 
-              type="text" 
-              id="code" 
-              name="code" 
-              placeholder="e.g., DEMO2024" 
-              required 
-              autocomplete="off"
-            >
-          </div>
+          <div id="alert-container"></div>
 
-          <button type="submit" class="btn btn-primary" style="width: 100%;">
-            Login
-          </button>
-        </form>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="code">Classroom Code</label>
+              <input 
+                type="text" 
+                id="code" 
+                name="code" 
+                placeholder="Enter your code (e.g., DEMO2024)" 
+                required 
+                autocomplete="off"
+                autofocus
+              >
+              <small class="help-text">Ask your teacher if you don't have a code</small>
+            </div>
 
-        <p style="margin-top: 1.5rem; text-align: center;">
-          <small>Don't have a code? Contact your administrator.</small>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+              Continue
+            </button>
+          </form>
+        </div>
+
+        <p style="text-align: center; margin-top: 2rem; font-size: 0.875rem; color: var(--muted-foreground);">
+          Submit ideas • Vote on policies • Shape your school
         </p>
       </div>
     </div>

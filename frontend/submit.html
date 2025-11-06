@@ -3,21 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Submit Policy - VOTE</title>
+  <title>Vote - Submit Policy</title>
   <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
   <link rel="stylesheet" href="/css/styles.css">
+  
+  <!-- Plausible Analytics -->
+  <script defer data-domain="vote.prigoana.com" src="https://plausible.canine.tools/js/script.hash.outbound-links.pageview-props.tagged-events.js"></script>
+  <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
 <body>
   <header>
     <div class="header-content">
-      <a href="/" class="logo">
-        <img src="https://prigoana.com/favicon.png" alt="Logo">
-        VOTE
-      </a>
+      <a href="/dashboard" class="logo">Vote</a>
       <nav>
-        <a href="/dashboard">Dashboard</a>
+        <a href="/dashboard">Policies</a>
         <a href="/submit">Submit</a>
         <a href="/admin" id="admin-link" style="display: none;">Admin</a>
+        <a href="/superuser" id="superuser-link" style="display: none;">Superuser</a>
         <button class="logout-btn" onclick="logout()">Logout</button>
       </nav>
     </div>
@@ -25,11 +27,13 @@
 
   <main class="container">
     <div style="max-width: 600px; margin: 0 auto;">
-      <h1>Submit Policy</h1>
-      <p>Propose a new school policy idea for review.</p>
+      <div class="page-header">
+        <h1>Submit a Policy</h1>
+        <p>Share your idea to improve our school. Admins will review it before it goes live.</p>
+      </div>
 
-      <div class="alert alert-warning" style="margin-bottom: 1.5rem;">
-        <strong>Notice:</strong> Policies are submitted to the Student Union and must be approved by school administration and the school board.
+      <div class="alert alert-warning">
+        <strong>Important:</strong> Policies must be approved by school administration and the board. The Student Union will advocate for approved proposals.
       </div>
 
       <div id="alert-container"></div>
@@ -37,30 +41,40 @@
       <div class="card">
         <form id="policy-form">
           <div class="form-group">
-            <label for="title">Title</label>
+            <label for="title">Policy Title</label>
             <input 
               type="text" 
               id="title" 
               name="title" 
-              placeholder="e.g., Implement 4-Day School Week"
+              placeholder="e.g., Add More Outdoor Seating Areas"
               minlength="10"
               maxlength="200"
               required
             >
-            <small>10-200 characters</small>
+            <small class="help-text">Be clear and concise (10-200 characters)</small>
+            <div id="title-counter" class="help-text" style="text-align: right; margin-top: 0.25rem;">0/200</div>
           </div>
 
           <div class="form-group">
-            <label for="description">Description</label>
+            <label for="category">Category (Optional)</label>
+            <select id="category" name="category">
+              <option value="">Select a category...</option>
+            </select>
+            <small class="help-text">Help others find your policy</small>
+          </div>
+
+          <div class="form-group">
+            <label for="description">Detailed Description</label>
             <textarea 
               id="description" 
               name="description" 
-              placeholder="Explain your policy idea in detail..."
-              minlength="5"
+              placeholder="Explain your policy idea, why it matters, and how it could be implemented..."
+              minlength="50"
               maxlength="2000"
               required
             ></textarea>
-            <small>5-200 characters</small>
+            <small class="help-text">Provide details and reasoning (50-2000 characters)</small>
+            <div id="description-counter" class="help-text" style="text-align: right; margin-top: 0.25rem;">0/2000</div>
           </div>
 
           <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">

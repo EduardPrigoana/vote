@@ -1,3 +1,6 @@
+// requireAuth(), isAdmin(), isSuperuser() are assumed to be defined elsewhere
+
+// --- Initial Setup ---
 requireAuth();
 
 if (isAdmin()) {
@@ -10,17 +13,16 @@ if (isSuperuser()) {
 
 const policiesContainer = document.getElementById('policies-container');
 const alertContainer = document.getElementById('alert-container');
-const voteStatusCache = {};
-let categories = [];
+let searchTimeout;
 
-// Load categories
+// --- API and Rendering Functions ---
+
+// Load categories (this function was already good)
 async function loadCategories() {
   try {
-    categories = await apiRequest('/categories?lang=en');
-    
+    const categories = await apiRequest('/categories?lang=en');
     const categoryFilter = document.getElementById('category-filter');
     categoryFilter.innerHTML = '<option value="">All Categories</option>';
-    
     categories.forEach(cat => {
       const option = document.createElement('option');
       option.value = cat.id;
@@ -32,21 +34,20 @@ async function loadCategories() {
   }
 }
 
-// Load policies with filters
+// Load policies (now much more efficient)
 async function loadPolicies() {
   const search = document.getElementById('search-input')?.value || '';
   const category = document.getElementById('category-filter')?.value || '';
   const status = document.getElementById('status-filter')?.value || '';
   const sort = document.getElementById('sort-filter')?.value || 'newest';
 
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ lang: 'en', sort });
   if (search) params.append('search', search);
   if (category) params.append('category', category);
   if (status) params.append('status', status);
-  if (sort) params.append('sort', sort);
-  params.append('lang', 'en');
 
   try {
+    // Single API call now gets all policies and their vote statuses
     const policies = await apiRequest(`/policies?${params.toString()}`);
 
     if (policies.length === 0) {
@@ -60,18 +61,9 @@ async function loadPolicies() {
       return;
     }
 
-    // Load vote status for each policy
-    for (const policy of policies) {
-      try {
-        const status = await apiRequest(`/votes/status/${policy.id}`);
-        voteStatusCache[policy.id] = status;
-      } catch (error) {
-        console.error(`Failed to load vote status for ${policy.id}`, error);
-      }
-    }
-
-    policiesContainer.innerHTML = policies.map(policy => renderPolicyCard(policy)).join('');
+    policiesContainer.innerHTML = policies.map(renderPolicyCard).join('');
     attachVoteHandlers();
+
   } catch (error) {
     policiesContainer.innerHTML = `
       <div class="alert alert-error">
@@ -82,13 +74,14 @@ async function loadPolicies() {
 }
 
 function renderPolicyCard(policy) {
-  const voteStatus = voteStatusCache[policy.id] || { device_has_voted: false };
-  const deviceHasVoted = voteStatus.device_has_voted;
+  // Assumes API now returns `current_user_vote` (`null`, 'upvote', or 'downvote')
+  const deviceHasVoted = !!policy.current_user_vote;
   const totalVotes = (policy.upvotes || 0) + (policy.downvotes || 0);
   const supportPercentage = totalVotes > 0 ? ((policy.upvotes || 0) / totalVotes * 100).toFixed(1) : 0;
-
+  
+  // Use a unique ID for the card to make it easy to update later
   return `
-    <div class="card">
+    <div class="card" id="policy-card-${policy.id}" data-policy-id="${policy.id}">
       <div class="card-header">
         <div style="flex: 1;">
           <h3 class="card-title">${escapeHtml(policy.title)}</h3>
@@ -99,167 +92,142 @@ function renderPolicyCard(policy) {
       
       <p>${escapeHtml(policy.description)}</p>
       
-      ${policy.admin_comment ? `
-        <div class="info-box">
-          <strong>Admin:</strong> ${escapeHtml(policy.admin_comment)}
-        </div>
-      ` : ''}
+      ${policy.admin_comment ? `<div class="info-box"><strong>Admin:</strong> ${escapeHtml(policy.admin_comment)}</div>` : ''}
       
-      ${totalVotes > 0 ? `
-        <div class="vote-progress">
-          <div class="vote-progress-label">
-            <span>Support: ${supportPercentage}%</span>
-            <span>Oppose: ${(100 - supportPercentage).toFixed(1)}%</span>
-          </div>
-          <div class="vote-progress-bar-container">
-            <div class="vote-progress-bar" style="width: ${supportPercentage}%"></div>
-          </div>
-          <div class="vote-stats">
-            <span class="vote-stat">
-              <span class="vote-stat-number">${policy.upvotes || 0}</span> support
-            </span>
-            <span class="vote-stat">
-              <span class="vote-stat-number">${policy.downvotes || 0}</span> oppose
-            </span>
-          </div>
+      <div class="vote-progress">
+        ${totalVotes > 0 ? `
+            <div class="vote-progress-label">
+              <span>Support: ${supportPercentage}%</span>
+              <span>Oppose: ${(100 - supportPercentage).toFixed(1)}%</span>
+            </div>
+            <div class="vote-progress-bar-container">
+              <div class="vote-progress-bar" style="width: ${supportPercentage}%"></div>
+            </div>
+        ` : `
+            <div style="margin-bottom: 0.75rem; text-align:center;"><small>No votes yet.</small></div>
+        `}
+        <div class="vote-stats">
+          <span class="vote-stat">
+            <span class="vote-stat-number" data-role="upvote-count">${policy.upvotes || 0}</span> support
+          </span>
+          <span class="vote-stat">
+            <span class="vote-stat-number" data-role="downvote-count">${policy.downvotes || 0}</span> oppose
+          </span>
         </div>
-      ` : `
-        <div style="margin-top: 1rem; padding: 0.75rem; background: var(--muted); border-radius: calc(var(--radius) - 2px); text-align: center;">
-          <small style="color: var(--muted-foreground);">No votes yet — be the first!</small>
-        </div>
-      `}
-      
-      <div class="vote-container">
-        <button 
-          class="vote-btn upvote" 
-          data-policy-id="${policy.id}" 
-          data-vote-type="upvote"
-          ${deviceHasVoted ? 'disabled' : ''}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
-          </svg>
-          <span class="vote-count">${policy.upvotes || 0}</span>
-        </button>
-        
-        <button 
-          class="vote-btn downvote" 
-          data-policy-id="${policy.id}" 
-          data-vote-type="downvote"
-          ${deviceHasVoted ? 'disabled' : ''}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-          <span class="vote-count">${policy.downvotes || 0}</span>
-        </button>
       </div>
       
-      ${deviceHasVoted ? `
-        <div style="margin-top: 0.75rem;">
-          <small>✓ You've voted from this device</small>
-        </div>
-      ` : ''}
+      <div class="vote-actions">
+          <div class="vote-container">
+              <button class="vote-btn upvote" data-vote-type="upvote" ${deviceHasVoted ? 'disabled' : ''}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg>
+                  <span class="vote-count" data-role="upvote-btn-count">${policy.upvotes || 0}</span>
+              </button>
+              <button class="vote-btn downvote" data-vote-type="downvote" ${deviceHasVoted ? 'disabled' : ''}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  <span class="vote-count" data-role="downvote-btn-count">${policy.downvotes || 0}</span>
+              </button>
+          </div>
+          ${deviceHasVoted ? `<div class="vote-feedback"><small>✓ You've voted</small></div>` : '<div class="vote-feedback"></div>'}
+      </div>
     </div>
   `;
 }
 
+// --- Event Handlers ---
+
 function attachVoteHandlers() {
-  document.querySelectorAll('.vote-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const button = e.currentTarget;
-      const policyId = button.dataset.policyId;
-      const voteType = button.dataset.voteType;
+  policiesContainer.addEventListener('click', async (e) => {
+    const button = e.target.closest('.vote-btn');
+    if (!button || button.disabled) return;
 
-      if (button.disabled) return;
+    const card = button.closest('.card');
+    const policyId = card.dataset.policyId;
+    const voteType = button.dataset.voteType;
 
-      button.disabled = true;
+    const upvoteBtn = card.querySelector('.vote-btn.upvote');
+    const downvoteBtn = card.querySelector('.vote-btn.downvote');
 
-      try {
-        await apiRequest('/votes', {
-          method: 'POST',
-          body: JSON.stringify({
-            policy_id: policyId,
-            vote_type: voteType,
-          }),
-        });
+    // Disable buttons immediately for good UX
+    upvoteBtn.disabled = true;
+    downvoteBtn.disabled = true;
 
-        alertContainer.innerHTML = `
-          <div class="alert alert-success">
-            <strong>Success!</strong> Your vote has been recorded.
-          </div>
-        `;
+    try {
+      // API call to record the vote
+      await apiRequest('/votes', {
+        method: 'POST',
+        body: JSON.stringify({ policy_id: policyId, vote_type: voteType }),
+      });
 
-        setTimeout(() => {
-          alertContainer.innerHTML = '';
-        }, 3000);
+      // Update UI directly instead of reloading everything
+      const countElement = card.querySelector(`[data-role="${voteType}-count"]`);
+      const buttonCountElement = card.querySelector(`[data-role="${voteType}-btn-count"]`);
+      const newCount = parseInt(countElement.textContent, 10) + 1;
+      
+      countElement.textContent = newCount;
+      buttonCountElement.textContent = newCount;
+      
+      card.querySelector('.vote-feedback').innerHTML = `<small>✓ Thanks for voting!</small>`;
 
-        if (typeof plausible !== 'undefined') {
-          plausible('Vote', { props: { type: voteType } });
-        }
+      showTempAlert('<strong>Success!</strong> Your vote has been recorded.', 'success');
 
-        loadPolicies();
-
-      } catch (error) {
-        alertContainer.innerHTML = `
-          <div class="alert alert-error">
-            <strong>Error:</strong> ${error.message}
-          </div>
-        `;
-        
-        setTimeout(() => {
-          alertContainer.innerHTML = '';
-        }, 5000);
-
-        button.disabled = false;
+      if (typeof plausible !== 'undefined') {
+        plausible('Vote', { props: { type: voteType } });
       }
-    });
+
+    } catch (error) {
+      showTempAlert(`<strong>Error:</strong> ${error.message}`, 'error', 5000);
+      
+      // Re-enable buttons if the API call failed
+      upvoteBtn.disabled = false;
+      downvoteBtn.disabled = false;
+    }
   });
 }
 
-// Search & filter handlers
-let searchTimeout;
-document.getElementById('search-input')?.addEventListener('input', (e) => {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => {
+function setupFilterHandlers() {
+  document.getElementById('search-input')?.addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      loadPolicies();
+      if (typeof plausible !== 'undefined' && e.target.value) {
+        plausible('Search', { props: { query: e.target.value } });
+      }
+    }, 500);
+  });
+
+  document.getElementById('category-filter')?.addEventListener('change', () => {
     loadPolicies();
-    
-    if (typeof plausible !== 'undefined' && e.target.value) {
-      plausible('Search', { props: { query: e.target.value } });
-    }
-  }, 500);
-});
+    if (typeof plausible !== 'undefined') plausible('Filter Category');
+  });
 
-document.getElementById('category-filter')?.addEventListener('change', () => {
-  loadPolicies();
-  
-  if (typeof plausible !== 'undefined') {
-    plausible('Filter Category');
-  }
-});
+  document.getElementById('status-filter')?.addEventListener('change', () => {
+    loadPolicies();
+    if (typeof plausible !== 'undefined') plausible('Filter Status');
+  });
 
-document.getElementById('status-filter')?.addEventListener('change', () => {
-  loadPolicies();
-  
-  if (typeof plausible !== 'undefined') {
-    plausible('Filter Status');
-  }
-});
+  document.getElementById('sort-filter')?.addEventListener('change', () => {
+    loadPolicies();
+    if (typeof plausible !== 'undefined') plausible('Change Sort');
+  });
+}
 
-document.getElementById('sort-filter')?.addEventListener('change', () => {
-  loadPolicies();
-  
-  if (typeof plausible !== 'undefined') {
-    plausible('Change Sort');
-  }
-});
+// --- Utility Functions ---
+
+function showTempAlert(message, type, duration = 3000) {
+  alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+  setTimeout(() => {
+    alertContainer.innerHTML = '';
+  }, duration);
+}
 
 function escapeHtml(text) {
+  if (text === null || typeof text === 'undefined') return '';
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
 
-// Initialize
+// --- Initialize Page ---
 loadCategories();
 loadPolicies();
+setupFilterHandlers();

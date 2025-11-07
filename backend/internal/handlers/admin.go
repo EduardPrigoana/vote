@@ -22,19 +22,13 @@ func NewAdminHandler(db *database.Database, auditLogger *utils.AuditLogger) *Adm
 	}
 }
 
-// GET /api/v1/admin/policies
 func (h *AdminHandler) GetAllPolicies(c *fiber.Ctx) error {
 	status := c.Query("status")
 
 	query := `
 		SELECT 
-			p.id, 
-			p.title, 
-			p.description, 
-			p.status,
-			p.admin_comment,
-			p.submitted_by,
-			p.created_at,
+			p.id, p.title, p.description, p.status, p.admin_comment,
+			p.submitted_by, p.created_at, p.category_id,
 			COALESCE(SUM(CASE WHEN v.vote_type = 'upvote' THEN 1 ELSE 0 END), 0) as upvotes,
 			COALESCE(SUM(CASE WHEN v.vote_type = 'downvote' THEN 1 ELSE 0 END), 0) as downvotes
 		FROM policies p
@@ -57,30 +51,145 @@ func (h *AdminHandler) GetAllPolicies(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
-	policies := []models.Policy{}
+	policies := []map[string]interface{}{}
 	for rows.Next() {
 		var p models.Policy
+		var categoryID sql.NullString
 		err := rows.Scan(
-			&p.ID,
-			&p.Title,
-			&p.Description,
-			&p.Status,
-			&p.AdminComment,
-			&p.SubmittedBy,
-			&p.CreatedAt,
-			&p.Upvotes,
-			&p.Downvotes,
+			&p.ID, &p.Title, &p.Description, &p.Status, &p.AdminComment,
+			&p.SubmittedBy, &p.CreatedAt, &categoryID, &p.Upvotes, &p.Downvotes,
 		)
 		if err != nil {
 			continue
 		}
-		policies = append(policies, p)
+
+		policyMap := map[string]interface{}{
+			"id":            p.ID,
+			"title":         p.Title,
+			"description":   p.Description,
+			"status":        p.Status,
+			"admin_comment": p.AdminComment,
+			"submitted_by":  p.SubmittedBy,
+			"created_at":    p.CreatedAt,
+			"upvotes":       p.Upvotes,
+			"downvotes":     p.Downvotes,
+		}
+
+		if categoryID.Valid {
+			policyMap["category_id"] = categoryID.String
+		}
+
+		policies = append(policies, policyMap)
 	}
 
 	return c.JSON(policies)
 }
 
-// POST /api/v1/admin/policies/:id/status
+func (h *AdminHandler) GetPolicyForEdit(c *fiber.Ctx) error {
+	policyID := c.Params("id")
+
+	var p models.Policy
+	var categoryID sql.NullString
+
+	err := h.DB.DB.QueryRow(`
+		SELECT id, title, description, status, admin_comment, category_id, created_at
+		FROM policies
+		WHERE id = $1
+	`, policyID).Scan(&p.ID, &p.Title, &p.Description, &p.Status, &p.AdminComment, &categoryID, &p.CreatedAt)
+
+	if err == sql.ErrNoRows {
+		return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
+			Error: "Policy not found",
+		})
+	}
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: "Database error",
+		})
+	}
+
+	response := map[string]interface{}{
+		"id":            p.ID,
+		"title":         p.Title,
+		"description":   p.Description,
+		"status":        p.Status,
+		"admin_comment": p.AdminComment,
+		"created_at":    p.CreatedAt,
+	}
+
+	if categoryID.Valid {
+		response["category_id"] = categoryID.String
+	}
+
+	return c.JSON(response)
+}
+
+func (h *AdminHandler) UpdatePolicy(c *fiber.Ctx) error {
+	policyID := c.Params("id")
+	userID := c.Locals("user_id").(string)
+
+	var req struct {
+		Title       string  `json:"title"`
+		Description string  `json:"description"`
+		CategoryID  *string `json:"category_id"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Invalid request body",
+		})
+	}
+
+	if len(req.Title) < 10 || len(req.Title) > 200 {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Title must be between 10 and 200 characters",
+		})
+	}
+
+	if len(req.Description) < 50 || len(req.Description) > 2000 {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Description must be between 50 and 2000 characters",
+		})
+	}
+
+	if utils.ContainsProfanity(req.Title) || utils.ContainsProfanity(req.Description) {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Content contains inappropriate language",
+		})
+	}
+
+	result, err := h.DB.DB.Exec(`
+		UPDATE policies 
+		SET title = $1, description = $2, category_id = $3
+		WHERE id = $4
+	`, req.Title, req.Description, req.CategoryID, policyID)
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: "Failed to update policy",
+		})
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
+			Error: "Policy not found",
+		})
+	}
+
+	if h.AuditLogger != nil {
+		h.AuditLogger.Log(userID, "update_policy", "policy", policyID, map[string]interface{}{
+			"title":       req.Title,
+			"description": req.Description,
+		})
+	}
+
+	return c.JSON(models.MessageResponse{
+		Message: "Policy updated successfully",
+	})
+}
+
 func (h *AdminHandler) UpdatePolicyStatus(c *fiber.Ctx) error {
 	policyID := c.Params("id")
 	userID := c.Locals("user_id").(string)
@@ -93,14 +202,8 @@ func (h *AdminHandler) UpdatePolicyStatus(c *fiber.Ctx) error {
 	}
 
 	validStatuses := map[string]bool{
-		"pending":          true,
-		"approved":         true,
-		"rejected":         true,
-		"uncertain":        true,
-		"in_progress":      true,
-		"completed":        true,
-		"on_hold":          true,
-		"cannot_implement": true,
+		"pending": true, "approved": true, "rejected": true, "uncertain": true,
+		"in_progress": true, "completed": true, "on_hold": true, "cannot_implement": true,
 	}
 
 	if !validStatuses[req.Status] {
@@ -128,7 +231,6 @@ func (h *AdminHandler) UpdatePolicyStatus(c *fiber.Ctx) error {
 		})
 	}
 
-	// Audit log
 	if h.AuditLogger != nil {
 		h.AuditLogger.Log(userID, "update_policy_status", "policy", policyID, map[string]interface{}{
 			"status":  req.Status,
@@ -141,7 +243,6 @@ func (h *AdminHandler) UpdatePolicyStatus(c *fiber.Ctx) error {
 	})
 }
 
-// POST /api/v1/admin/policies/:id/comment
 func (h *AdminHandler) AddComment(c *fiber.Ctx) error {
 	policyID := c.Params("id")
 	userID := c.Locals("user_id").(string)
@@ -175,7 +276,6 @@ func (h *AdminHandler) AddComment(c *fiber.Ctx) error {
 		})
 	}
 
-	// Audit log
 	if h.AuditLogger != nil {
 		h.AuditLogger.Log(userID, "add_comment", "policy", policyID, map[string]interface{}{
 			"comment": req.Comment,
@@ -187,15 +287,11 @@ func (h *AdminHandler) AddComment(c *fiber.Ctx) error {
 	})
 }
 
-// DELETE /api/v1/admin/policies/:id
 func (h *AdminHandler) DeletePolicy(c *fiber.Ctx) error {
 	policyID := c.Params("id")
 	userID := c.Locals("user_id").(string)
 
-	// Delete policy (CASCADE will handle votes)
-	result, err := h.DB.DB.Exec(`
-		DELETE FROM policies WHERE id = $1
-	`, policyID)
+	result, err := h.DB.DB.Exec(`DELETE FROM policies WHERE id = $1`, policyID)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
@@ -210,7 +306,6 @@ func (h *AdminHandler) DeletePolicy(c *fiber.Ctx) error {
 		})
 	}
 
-	// Audit log
 	if h.AuditLogger != nil {
 		h.AuditLogger.Log(userID, "delete_policy", "policy", policyID, nil)
 	}
@@ -220,7 +315,6 @@ func (h *AdminHandler) DeletePolicy(c *fiber.Ctx) error {
 	})
 }
 
-// POST /api/v1/admin/policies/bulk
 func (h *AdminHandler) BulkAction(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
@@ -244,15 +338,11 @@ func (h *AdminHandler) BulkAction(c *fiber.Ctx) error {
 		}
 
 		for _, policyID := range req.PolicyIDs {
-			_, err := h.DB.DB.Exec(`
-				UPDATE policies SET status = $1 WHERE id = $2
-			`, *req.Status, policyID)
-
+			_, err := h.DB.DB.Exec(`UPDATE policies SET status = $1 WHERE id = $2`, *req.Status, policyID)
 			if err != nil {
 				continue
 			}
 
-			// Audit log
 			if h.AuditLogger != nil {
 				h.AuditLogger.Log(userID, "bulk_update_status", "policy", policyID, map[string]interface{}{
 					"status": *req.Status,
@@ -263,12 +353,10 @@ func (h *AdminHandler) BulkAction(c *fiber.Ctx) error {
 	case "delete":
 		for _, policyID := range req.PolicyIDs {
 			_, err := h.DB.DB.Exec(`DELETE FROM policies WHERE id = $1`, policyID)
-
 			if err != nil {
 				continue
 			}
 
-			// Audit log
 			if h.AuditLogger != nil {
 				h.AuditLogger.Log(userID, "bulk_delete", "policy", policyID, nil)
 			}
@@ -282,15 +370,11 @@ func (h *AdminHandler) BulkAction(c *fiber.Ctx) error {
 		}
 
 		for _, policyID := range req.PolicyIDs {
-			_, err := h.DB.DB.Exec(`
-				UPDATE policies SET category_id = $1 WHERE id = $2
-			`, *req.CategoryID, policyID)
-
+			_, err := h.DB.DB.Exec(`UPDATE policies SET category_id = $1 WHERE id = $2`, *req.CategoryID, policyID)
 			if err != nil {
 				continue
 			}
 
-			// Audit log
 			if h.AuditLogger != nil {
 				h.AuditLogger.Log(userID, "bulk_set_category", "policy", policyID, map[string]interface{}{
 					"category_id": *req.CategoryID,
@@ -309,7 +393,6 @@ func (h *AdminHandler) BulkAction(c *fiber.Ctx) error {
 	})
 }
 
-// POST /api/v1/admin/users
 func (h *AdminHandler) CreateUser(c *fiber.Ctx) error {
 	var req models.CreateUserRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -333,7 +416,7 @@ func (h *AdminHandler) CreateUser(c *fiber.Ctx) error {
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: "Failed to create user (code may already exist)",
+			Error: "Failed to create user",
 		})
 	}
 
@@ -343,7 +426,6 @@ func (h *AdminHandler) CreateUser(c *fiber.Ctx) error {
 	})
 }
 
-// GET /api/v1/admin/stats
 func (h *AdminHandler) GetStats(c *fiber.Ctx) error {
 	var stats struct {
 		TotalPolicies   int `json:"total_policies"`
@@ -360,7 +442,6 @@ func (h *AdminHandler) GetStats(c *fiber.Ctx) error {
 	return c.JSON(stats)
 }
 
-// GET /api/v1/admin/audit-log
 func (h *AdminHandler) GetAuditLog(c *fiber.Ctx) error {
 	limit := c.QueryInt("limit", 50)
 	offset := c.QueryInt("offset", 0)

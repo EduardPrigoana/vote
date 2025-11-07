@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Student policy voting platform">
+  <meta name="keywords" content="voting, policy, student, school">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://vote.prigoana.com">
+  <meta property="og:site_name" content="Vote">
+  <meta name="twitter:card" content="summary_large_image">
+  
+  <title id="page-title">Policy | Vote</title>
+  <meta id="page-description" name="description" content="View and vote on this policy">
+  <meta id="og-title" property="og:title" content="Policy | Vote">
+  <meta id="og-description" property="og:description" content="View and vote on this policy">
+  <meta id="twitter-title" name="twitter:title" content="Policy | Vote">
+  <meta id="twitter-description" name="twitter:description" content="View and vote on this policy">
+  
+  <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
+  <link rel="stylesheet" href="/css/styles.css">
+  
+  <script defer data-domain="vote.prigoana.com" src="https://plausible.canine.tools/js/script.hash.outbound-links.pageview-props.tagged-events.js"></script>
+  <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+  
+  <style>
+    .policy-detail {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .skeleton {
+      background: linear-gradient(90deg, var(--muted) 25%, var(--accent) 50%, var(--muted) 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s ease-in-out infinite;
+      border-radius: calc(var(--radius) - 2px);
+    }
+    @keyframes loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .skeleton-title {
+      height: 32px;
+      width: 70%;
+      margin-bottom: 1rem;
+    }
+    .skeleton-text {
+      height: 16px;
+      margin-bottom: 0.5rem;
+    }
+    .skeleton-badge {
+      height: 24px;
+      width: 80px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <div id="offline-banner" style="display: none; background: var(--warning); color: var(--warning-foreground); padding: 0.75rem; text-align: center; position: sticky; top: 0; z-index: 100;">
+    You are offline. Some features may not be available.
+  </div>
+
+  <header>
+    <div class="header-content">
+      <a href="/dashboard" class="logo">Vote</a>
+      <nav>
+        <a href="/dashboard">Policies</a>
+        <a href="/submit">Submit</a>
+        <a href="/admin" id="admin-link" style="display: none;">Admin</a>
+        <a href="/superuser" id="superuser-link" style="display: none;">Superuser</a>
+        <button id="theme-toggle" onclick="toggleTheme()"></button>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="policy-detail">
+      <div id="loading-skeleton" style="display: none;">
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton skeleton-badge" style="margin-bottom: 1rem;"></div>
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text" style="width: 60%;"></div>
+      </div>
+
+      <div id="alert-container"></div>
+      <div id="policy-container"></div>
+      
+      <div id="share-modal" style="display: none;"></div>
+    </div>
+  </main>
+
+  <script src="/js/theme.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/websocket.js"></script>
+  <script>
+    requireAuth();
+
+    if (isAdmin()) {
+      document.getElementById('admin-link').style.display = 'block';
+    }
+
+    if (isSuperuser()) {
+      document.getElementById('superuser-link').style.display = 'block';
+    }
+
+    const policyContainer = document.getElementById('policy-container');
+    const alertContainer = document.getElementById('alert-container');
+    const loadingSkeleton = document.getElementById('loading-skeleton');
+    const policyId = window.location.pathname.split('/').pop();
+
+    function updateMetaTags(policy) {
+      const title = `${policy.title} | Vote`;
+      const description = policy.description.substring(0, 160);
+      
+      document.getElementById('page-title').textContent = title;
+      document.getElementById('page-description').setAttribute('content', description);
+      document.getElementById('og-title').setAttribute('content', title);
+      document.getElementById('og-description').setAttribute('content', description);
+      document.getElementById('twitter-title').setAttribute('content', title);
+      document.getElementById('twitter-description').setAttribute('content', description);
+    }
+
+    async function loadPolicy() {
+      loadingSkeleton.style.display = 'block';
+      policyContainer.innerHTML = '';
+
+      try {
+        const policy = await apiRequest(`/policies/${policyId}`);
+        
+        updateMetaTags(policy);
+        
+        const deviceHasVoted = policy.current_user_vote;
+        const totalVotes = (policy.upvotes || 0) + (policy.downvotes || 0);
+        const supportPercentage = totalVotes > 0 ? ((policy.upvotes || 0) / totalVotes * 100).toFixed(1) : 0;
+
+        policyContainer.innerHTML = `
+          <div class="card" data-policy-id="${policy.id}">
+            <div class="card-header">
+              <div style="flex: 1;">
+                <h1 class="card-title">${escapeHtml(policy.title)}</h1>
+                ${policy.category_name ? `<small style="color: var(--muted-foreground);">${escapeHtml(policy.category_name)}</small>` : ''}
+              </div>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <span class="badge badge-${policy.status}">${policy.status}</span>
+                <button class="btn-icon" onclick="sharePolicy()">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                </button>
+              </div>
+            </div>
+            
+            <p style="white-space: pre-wrap; line-height: 1.8;">${escapeHtml(policy.description)}</p>
+            
+            ${policy.admin_comment ? `<div class="info-box"><strong>Admin:</strong> ${escapeHtml(policy.admin_comment)}</div>` : ''}
+            
+            <div class="vote-progress">
+              ${totalVotes > 0 ? `
+                  <div class="vote-progress-label">
+                    <span>Support: ${supportPercentage}%</span>
+                    <span>Oppose: ${(100 - supportPercentage).toFixed(1)}%</span>
+                  </div>
+                  <div class="vote-progress-bar-container">
+                    <div class="vote-progress-bar" style="width: ${supportPercentage}%"></div>
+                  </div>
+              ` : `
+                  <div style="margin-bottom: 0.75rem; text-align:center;"><small>No votes yet</small></div>
+              `}
+              <div class="vote-stats">
+                <span class="vote-stat">
+                  <span class="vote-stat-number" data-role="upvote-count">${policy.upvotes || 0}</span> support
+                </span>
+                <span class="vote-stat">
+                  <span class="vote-stat-number" data-role="downvote-count">${policy.downvotes || 0}</span> oppose
+                </span>
+              </div>
+            </div>
+            
+            <div class="vote-actions">
+                <div class="vote-container">
+                    <button class="vote-btn upvote" data-vote-type="upvote" ${deviceHasVoted ? 'disabled' : ''}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg>
+                        <span class="vote-count" data-role="upvote-btn-count">${policy.upvotes || 0}</span>
+                    </button>
+                    <button class="vote-btn downvote" data-vote-type="downvote" ${deviceHasVoted ? 'disabled' : ''}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                        <span class="vote-count" data-role="downvote-btn-count">${policy.downvotes || 0}</span>
+                    </button>
+                </div>
+                ${deviceHasVoted ? `<div class="vote-feedback"><small>Voted</small></div>` : '<div class="vote-feedback"></div>'}
+            </div>
+
+            <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <small style="color: var(--muted-foreground);">
+                Views: ${policy.view_count || 0} | Submitted: ${new Date(policy.created_at).toLocaleDateString()}
+              </small>
+              <a href="/dashboard" class="btn btn-secondary">Back to Policies</a>
+            </div>
+          </div>
+        `;
+
+        attachVoteHandler();
+        loadingSkeleton.style.display = 'none';
+
+      } catch (error) {
+        loadingSkeleton.style.display = 'none';
+        policyContainer.innerHTML = `
+          <div class="alert alert-error">${error.message}</div>
+          <a href="/dashboard" class="btn btn-secondary">Back to Policies</a>
+        `;
+      }
+    }
+
+    function attachVoteHandler() {
+      const card = policyContainer.querySelector('.card');
+      if (!card) return;
+
+      card.addEventListener('click', async (e) => {
+        const button = e.target.closest('.vote-btn');
+        if (!button || button.disabled) return;
+
+        const voteType = button.dataset.voteType;
+        const upvoteBtn = card.querySelector('.vote-btn.upvote');
+        const downvoteBtn = card.querySelector('.vote-btn.downvote');
+
+        upvoteBtn.disabled = true;
+        downvoteBtn.disabled = true;
+
+        try {
+          await apiRequest('/votes', {
+            method: 'POST',
+            body: JSON.stringify({ policy_id: policyId, vote_type: voteType }),
+          });
+
+          card.querySelector('.vote-feedback').innerHTML = `<small>Vote recorded</small>`;
+
+          showTempAlert('Vote recorded', 'success');
+
+          if (typeof plausible !== 'undefined') {
+            plausible('Vote', { props: { type: voteType } });
+          }
+
+        } catch (error) {
+          showTempAlert(error.message, 'error', 5000);
+          
+          upvoteBtn.disabled = false;
+          downvoteBtn.disabled = false;
+        }
+      });
+    }
+
+    function sharePolicy() {
+      const url = window.location.href;
+      const title = document.querySelector('.card-title').textContent;
+      
+      if (navigator.share) {
+        navigator.share({
+          title: title,
+          text: `Check out this policy: ${title}`,
+          url: url
+        }).catch((error) => console.log('Share failed:', error));
+      } else {
+        copyToClipboard(url);
+        showTempAlert('Link copied to clipboard', 'success');
+      }
+    }
+
+    function copyToClipboard(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+
+    function showTempAlert(message, type, duration = 3000) {
+      alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+      setTimeout(() => {
+        alertContainer.innerHTML = '';
+      }, duration);
+    }
+
+    function escapeHtml(text) {
+      if (text === null || typeof text === 'undefined') return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    window.addEventListener('online', () => {
+      document.getElementById('offline-banner').style.display = 'none';
+    });
+
+    window.addEventListener('offline', () => {
+      document.getElementById('offline-banner').style.display = 'block';
+    });
+
+    if (!navigator.onLine) {
+      document.getElementById('offline-banner').style.display = 'block';
+    }
+
+    loadPolicy();
+  </script>
+</body>
+</html>

@@ -12,18 +12,8 @@ let currentPolicyId = null;
 let currentAction = null;
 let policyToDelete = null;
 let selectedPolicies = new Set();
+let editingPolicyId = null;
 
-// Language toggle
-window.toggleLanguage = function() {
-  const current = getCurrentLanguage();
-  const newLang = current === 'en' ? 'ro' : 'en';
-  setLanguage(newLang);
-  document.getElementById('lang-toggle').textContent = newLang === 'en' ? 'RO' : 'EN';
-  loadStats();
-  loadPolicies();
-}
-
-// Tab switching
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -44,13 +34,11 @@ function switchTab(tab) {
     loadAuditLog();
   }
 
-  // Track with Plausible
   if (typeof plausible !== 'undefined') {
     plausible('Admin Tab Switch', { props: { tab: tab } });
   }
 }
 
-// Load stats
 async function loadStats() {
   try {
     const stats = await apiRequest('/admin/stats');
@@ -74,7 +62,7 @@ async function loadPolicies() {
       policiesContainer.innerHTML = `
         <div class="empty-state">
           <h3>No policies found</h3>
-          <p>Try adjusting your filter.</p>
+          <p>Adjust your filter.</p>
         </div>
       `;
       return;
@@ -107,7 +95,7 @@ async function loadPolicies() {
                 <td>
                   <strong>${escapeHtml(policy.title)}</strong><br>
                   <small style="color: var(--muted-foreground);">${escapeHtml(policy.description.substring(0, 100))}...</small>
-                  ${policy.admin_comment ? `<br><small style="color: var(--foreground); opacity: 0.8;">💬 ${escapeHtml(policy.admin_comment)}</small>` : ''}
+                  ${policy.admin_comment ? `<br><small style="color: var(--foreground); opacity: 0.8;">${escapeHtml(policy.admin_comment)}</small>` : ''}
                 </td>
                 <td>
                   <span class="badge badge-${policy.status}">${policy.status}</span>
@@ -157,6 +145,8 @@ async function loadPolicies() {
 function renderActionButtons(policy) {
   let buttons = '';
   
+  buttons += `<button class="btn btn-secondary btn-sm" onclick="openEditModal('${policy.id}')">Edit</button>`;
+  
   if (policy.status !== 'approved') {
     buttons += `<button class="btn btn-success btn-sm" onclick="updateStatus('${policy.id}', 'approved')">Approve</button>`;
   }
@@ -185,7 +175,82 @@ function renderActionButtons(policy) {
   return buttons;
 }
 
-// Selection management
+async function openEditModal(policyId) {
+  try {
+    const policy = await apiRequest(`/admin/policies/${policyId}`);
+    const categories = await apiRequest('/categories');
+    
+    editingPolicyId = policyId;
+    
+    document.getElementById('edit-policy-title').value = policy.title;
+    document.getElementById('edit-policy-description').value = policy.description;
+    
+    const categorySelect = document.getElementById('edit-policy-category');
+    categorySelect.innerHTML = '<option value="">Select category...</option>';
+    categories.forEach(cat => {
+      const option = document.createElement('option');
+      option.value = cat.id;
+      option.textContent = cat.name;
+      if (policy.category_id === cat.id) {
+        option.selected = true;
+      }
+      categorySelect.appendChild(option);
+    });
+    
+    document.getElementById('edit-modal').style.display = 'block';
+    
+  } catch (error) {
+    alertContainer.innerHTML = `
+      <div class="alert alert-error">${error.message}</div>
+    `;
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  editingPolicyId = null;
+}
+
+document.getElementById('edit-policy-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const title = document.getElementById('edit-policy-title').value.trim();
+  const description = document.getElementById('edit-policy-description').value.trim();
+  const category = document.getElementById('edit-policy-category').value || null;
+  
+  try {
+    await apiRequest(`/admin/policies/${editingPolicyId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        title: title,
+        description: description,
+        category_id: category
+      }),
+    });
+
+    alertContainer.innerHTML = `
+      <div class="alert alert-success">Policy updated</div>
+    `;
+
+    setTimeout(() => {
+      alertContainer.innerHTML = '';
+    }, 3000);
+
+    closeEditModal();
+    loadPolicies();
+    loadStats();
+
+    if (typeof plausible !== 'undefined') {
+      plausible('Edit Policy');
+    }
+
+  } catch (error) {
+    alertContainer.innerHTML = `
+      <div class="alert alert-error">${error.message}</div>
+    `;
+  }
+});
+
 function toggleSelectAll(checked) {
   document.querySelectorAll('.policy-checkbox').forEach(checkbox => {
     checkbox.checked = checked;
@@ -204,7 +269,6 @@ function togglePolicySelection(policyId, selected) {
     selectedPolicies.size > 0 ? 'inline-flex' : 'none';
 }
 
-// Bulk delete
 async function bulkDelete() {
   if (selectedPolicies.size === 0) return;
   
@@ -233,7 +297,6 @@ async function bulkDelete() {
     loadPolicies();
     loadStats();
 
-    // Track with Plausible
     if (typeof plausible !== 'undefined') {
       plausible('Bulk Delete');
     }
@@ -270,7 +333,6 @@ async function exportCSV() {
     window.URL.revokeObjectURL(downloadUrl);
     document.body.removeChild(a);
     
-    // Track with Plausible
     if (typeof plausible !== 'undefined') {
       plausible('Export CSV', { props: { selected: selectedPolicies.size } });
     }
@@ -304,7 +366,6 @@ async function exportExcel() {
     window.URL.revokeObjectURL(downloadUrl);
     document.body.removeChild(a);
     
-    // Track with Plausible
     if (typeof plausible !== 'undefined') {
       plausible('Export Excel', { props: { selected: selectedPolicies.size } });
     }
@@ -313,9 +374,6 @@ async function exportExcel() {
   }
 }
 
-// *** START OF FIX ***
-// The following 'loadAnalytics' function was missing. The code was in the global
-// scope, causing the "container is not defined" error.
 async function loadAnalytics() {
   const container = document.getElementById('analytics-tab');
   container.innerHTML = '<div class="loading">Loading analytics...</div>';
@@ -339,7 +397,7 @@ async function loadAnalytics() {
         </div>
         <div class="stat-card">
           <div class="stat-value">${analytics.policy_success_rate.toFixed(1)}%</div>
-          <div class="stat-label">Policy Success Rate</div>
+          <div class="stat-label">Success Rate</div>
         </div>
       </div>
 
@@ -347,10 +405,10 @@ async function loadAnalytics() {
       <table>
         <thead>
           <tr>
-            <th>Classroom Code</th>
+            <th>Code</th>
             <th>Votes</th>
             <th>Policies</th>
-            <th>Engagement Score</th>
+            <th>Engagement</th>
           </tr>
         </thead>
         <tbody>
@@ -365,7 +423,7 @@ async function loadAnalytics() {
         </tbody>
       </table>
 
-      <h2 style="margin-top: 2rem; margin-bottom: 1rem;">Category Distribution</h2>
+      <h2 style="margin-top: 2rem; margin-bottom: 1rem;">Categories</h2>
       <table>
         <thead>
           <tr>
@@ -389,9 +447,7 @@ async function loadAnalytics() {
     container.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
   }
 }
-// *** END OF FIX ***
 
-// Audit Log
 async function loadAuditLog() {
   const container = document.getElementById('audit-container');
   container.innerHTML = '<div class="loading">Loading audit log...</div>';
@@ -400,7 +456,7 @@ async function loadAuditLog() {
     const logs = await apiRequest('/admin/audit-log?limit=100');
 
     if (logs.length === 0) {
-      container.innerHTML = '<div class="empty-state"><p>No audit logs yet</p></div>';
+      container.innerHTML = '<div class="empty-state"><p>No audit logs</p></div>';
       return;
     }
 
@@ -434,7 +490,6 @@ async function loadAuditLog() {
   }
 }
 
-// Modal functions
 function updateStatus(policyId, status) {
   currentPolicyId = policyId;
   currentAction = status;
@@ -448,7 +503,7 @@ function addComment(policyId) {
   currentPolicyId = policyId;
   currentAction = 'comment';
   
-  document.getElementById('modal-title').textContent = 'Add/Update Comment';
+  document.getElementById('modal-title').textContent = 'Add Comment';
   document.getElementById('admin-comment').value = '';
   document.getElementById('modal').style.display = 'block';
 }
@@ -494,9 +549,7 @@ document.getElementById('modal-confirm').addEventListener('click', async () => {
     }
 
     alertContainer.innerHTML = `
-      <div class="alert alert-success">
-        <strong>Success!</strong> Policy updated successfully.
-      </div>
+      <div class="alert alert-success">Policy updated</div>
     `;
 
     setTimeout(() => {
@@ -507,16 +560,13 @@ document.getElementById('modal-confirm').addEventListener('click', async () => {
     loadPolicies();
     loadStats();
 
-    // Track with Plausible
     if (typeof plausible !== 'undefined') {
       plausible('Admin Action', { props: { action: currentAction } });
     }
 
   } catch (error) {
     alertContainer.innerHTML = `
-      <div class="alert alert-error">
-        <strong>Error:</strong> ${error.message}
-      </div>
+      <div class="alert alert-error">${error.message}</div>
     `;
   }
 });
@@ -530,7 +580,7 @@ document.getElementById('confirm-delete-btn').addEventListener('click', async ()
     });
 
     alertContainer.innerHTML = `
-      <div class="alert alert-success">Policy deleted successfully.</div>
+      <div class="alert alert-success">Policy deleted</div>
     `;
 
     setTimeout(() => {
@@ -541,7 +591,6 @@ document.getElementById('confirm-delete-btn').addEventListener('click', async ()
     loadPolicies();
     loadStats();
 
-    // Track with Plausible
     if (typeof plausible !== 'undefined') {
       plausible('Delete Policy');
     }
@@ -562,7 +611,5 @@ function escapeHtml(text) {
 
 statusFilter.addEventListener('change', loadPolicies);
 
-// Initial loads
 loadStats();
 loadPolicies();
-

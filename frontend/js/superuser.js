@@ -7,7 +7,6 @@ const editForm = document.getElementById('edit-user-form');
 
 let userToDelete = null;
 
-// Load all users
 async function loadUsers() {
   try {
     const users = await apiRequest('/superuser/users');
@@ -15,7 +14,7 @@ async function loadUsers() {
     if (users.length === 0) {
       usersContainer.innerHTML = `
         <div class="empty-state">
-          <h3>No users yet</h3>
+          <h3>No users</h3>
           <p>Create the first user above.</p>
         </div>
       `;
@@ -26,7 +25,7 @@ async function loadUsers() {
       <table>
         <thead>
           <tr>
-            <th>Login Code</th>
+            <th>Code</th>
             <th>Role</th>
             <th>Status</th>
             <th>Created</th>
@@ -76,7 +75,6 @@ async function loadUsers() {
   }
 }
 
-// Create new user
 createForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -99,9 +97,7 @@ createForm.addEventListener('submit', async (e) => {
     });
 
     alertContainer.innerHTML = `
-      <div class="alert alert-success">
-        <strong>Success!</strong> User created successfully.
-      </div>
+      <div class="alert alert-success">User created</div>
     `;
 
     setTimeout(() => {
@@ -113,9 +109,7 @@ createForm.addEventListener('submit', async (e) => {
 
   } catch (error) {
     alertContainer.innerHTML = `
-      <div class="alert alert-error">
-        <strong>Error:</strong> ${error.message}
-      </div>
+      <div class="alert alert-error">${error.message}</div>
     `;
   } finally {
     submitBtn.disabled = false;
@@ -123,7 +117,6 @@ createForm.addEventListener('submit', async (e) => {
   }
 });
 
-// Toggle user status
 async function toggleUserStatus(userId) {
   try {
     await apiRequest(`/superuser/users/${userId}/toggle`, {
@@ -131,7 +124,7 @@ async function toggleUserStatus(userId) {
     });
 
     alertContainer.innerHTML = `
-      <div class="alert alert-success">User status updated.</div>
+      <div class="alert alert-success">Status updated</div>
     `;
 
     setTimeout(() => {
@@ -147,7 +140,6 @@ async function toggleUserStatus(userId) {
   }
 }
 
-// Open edit modal
 function openEditModal(userId, loginCode, role, isActive) {
   document.getElementById('edit-user-id').value = userId;
   document.getElementById('edit-login-code').value = loginCode;
@@ -160,7 +152,6 @@ function closeEditModal() {
   document.getElementById('edit-modal').style.display = 'none';
 }
 
-// Edit user
 editForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -184,7 +175,7 @@ editForm.addEventListener('submit', async (e) => {
     });
 
     alertContainer.innerHTML = `
-      <div class="alert alert-success">User updated successfully.</div>
+      <div class="alert alert-success">User updated</div>
     `;
 
     setTimeout(() => {
@@ -200,11 +191,10 @@ editForm.addEventListener('submit', async (e) => {
     `;
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Save Changes';
+    submitBtn.textContent = 'Save';
   }
 });
 
-// Delete user
 function confirmDelete(userId, loginCode) {
   userToDelete = userId;
   document.getElementById('delete-user-code').textContent = loginCode;
@@ -225,7 +215,7 @@ document.getElementById('confirm-delete-btn').addEventListener('click', async ()
     });
 
     alertContainer.innerHTML = `
-      <div class="alert alert-success">User deleted successfully.</div>
+      <div class="alert alert-success">User deleted</div>
     `;
 
     setTimeout(() => {

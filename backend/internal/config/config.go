@@ -9,15 +9,12 @@ import (
 )
 
 type Config struct {
-	Port               string
-	DatabaseURL        string
-	JWTSecret          string
-	JWTExpiry          time.Duration
-	SupabaseURL        string
-	SupabaseServiceKey string
-	SupabaseJWTSecret  string
-	AllowedOrigins     string
-	Environment        string
+	Port           string
+	DatabaseURL    string
+	JWTSecret      string
+	JWTExpiry      time.Duration
+	AllowedOrigins string
+	Environment    string
 }
 
 func Load() *Config {
@@ -26,15 +23,12 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:               getEnv("PORT", "8080"),
-		DatabaseURL:        getEnv("DATABASE_URL", ""),
-		JWTSecret:          getEnv("JWT_SECRET", ""),
-		JWTExpiry:          parseDuration(getEnv("JWT_EXPIRY", "24h")),
-		SupabaseURL:        getEnv("SUPABASE_URL", ""),
-		SupabaseServiceKey: getEnv("SUPABASE_SERVICE_ROLE_KEY", ""),
-		SupabaseJWTSecret:  getEnv("SUPABASE_JWT_SECRET", ""),
-		AllowedOrigins:     getEnv("ALLOWED_ORIGINS", "*"),
-		Environment:        getEnv("ENVIRONMENT", "development"),
+		Port:           getEnv("PORT", "8080"),
+		DatabaseURL:    getEnv("DATABASE_URL", ""),
+		JWTSecret:      getEnv("JWT_SECRET", ""),
+		JWTExpiry:      parseDuration(getEnv("JWT_EXPIRY", "24h")),
+		AllowedOrigins: getEnv("ALLOWED_ORIGINS", "https://vote.prigoana.com"),
+		Environment:    getEnv("ENVIRONMENT", "production"),
 	}
 }
 

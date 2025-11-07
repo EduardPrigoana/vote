@@ -18,10 +18,9 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     saveAuth(data.token, data.role, data.user_id);
 
     alertContainer.innerHTML = `
-      <div class="alert alert-success">Login successful! Redirecting...</div>
+      <div class="alert alert-success">Login successful</div>
     `;
 
-    // Track with Plausible
     if (typeof plausible !== 'undefined') {
       plausible('Login', { props: { role: data.role } });
     }
@@ -41,7 +40,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
       <div class="alert alert-error">${error.message}</div>
     `;
     
-    // Track with Plausible
     if (typeof plausible !== 'undefined') {
       plausible('Login Error');
     }

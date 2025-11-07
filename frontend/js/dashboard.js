@@ -1,6 +1,3 @@
-// requireAuth(), isAdmin(), isSuperuser() are assumed to be defined elsewhere
-
-// --- Initial Setup ---
 requireAuth();
 
 if (isAdmin()) {
@@ -15,12 +12,9 @@ const policiesContainer = document.getElementById('policies-container');
 const alertContainer = document.getElementById('alert-container');
 let searchTimeout;
 
-// --- API and Rendering Functions ---
-
-// Load categories (this function was already good)
 async function loadCategories() {
   try {
-    const categories = await apiRequest('/categories?lang=en');
+    const categories = await apiRequest('/categories');
     const categoryFilter = document.getElementById('category-filter');
     categoryFilter.innerHTML = '<option value="">All Categories</option>';
     categories.forEach(cat => {
@@ -34,27 +28,25 @@ async function loadCategories() {
   }
 }
 
-// Load policies (now much more efficient)
 async function loadPolicies() {
   const search = document.getElementById('search-input')?.value || '';
   const category = document.getElementById('category-filter')?.value || '';
   const status = document.getElementById('status-filter')?.value || '';
   const sort = document.getElementById('sort-filter')?.value || 'newest';
 
-  const params = new URLSearchParams({ lang: 'en', sort });
+  const params = new URLSearchParams({ sort });
   if (search) params.append('search', search);
   if (category) params.append('category', category);
   if (status) params.append('status', status);
 
   try {
-    // Single API call now gets all policies and their vote statuses
     const policies = await apiRequest(`/policies?${params.toString()}`);
 
     if (policies.length === 0) {
       policiesContainer.innerHTML = `
         <div class="empty-state">
           <h3>No policies found</h3>
-          <p>Try adjusting your filters or be the first to submit a policy!</p>
+          <p>Adjust filters or submit the first policy.</p>
           <a href="/submit" class="btn btn-primary">Submit Policy</a>
         </div>
       `;
@@ -66,20 +58,16 @@ async function loadPolicies() {
 
   } catch (error) {
     policiesContainer.innerHTML = `
-      <div class="alert alert-error">
-        <strong>Error:</strong> ${error.message}
-      </div>
+      <div class="alert alert-error">${error.message}</div>
     `;
   }
 }
 
 function renderPolicyCard(policy) {
-  // Assumes API now returns `current_user_vote` (`null`, 'upvote', or 'downvote')
   const deviceHasVoted = !!policy.current_user_vote;
   const totalVotes = (policy.upvotes || 0) + (policy.downvotes || 0);
   const supportPercentage = totalVotes > 0 ? ((policy.upvotes || 0) / totalVotes * 100).toFixed(1) : 0;
   
-  // Use a unique ID for the card to make it easy to update later
   return `
     <div class="card" id="policy-card-${policy.id}" data-policy-id="${policy.id}">
       <div class="card-header">
@@ -87,7 +75,15 @@ function renderPolicyCard(policy) {
           <h3 class="card-title">${escapeHtml(policy.title)}</h3>
           ${policy.category_name ? `<small style="color: var(--muted-foreground);">${escapeHtml(policy.category_name)}</small>` : ''}
         </div>
-        <span class="badge badge-${policy.status}">${policy.status}</span>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <span class="badge badge-${policy.status}">${policy.status}</span>
+          <button class="btn-icon" onclick="sharePolicy('${policy.id}', \`${escapeHtml(policy.title).replace(/`/g, '\\`')}\`)" title="Share policy">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          </button>
+          <a href="/policy/${policy.id}" class="btn-icon" title="View details">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
       </div>
       
       <p>${escapeHtml(policy.description)}</p>
@@ -104,7 +100,7 @@ function renderPolicyCard(policy) {
               <div class="vote-progress-bar" style="width: ${supportPercentage}%"></div>
             </div>
         ` : `
-            <div style="margin-bottom: 0.75rem; text-align:center;"><small>No votes yet.</small></div>
+            <div style="margin-bottom: 0.75rem; text-align:center;"><small>No votes yet</small></div>
         `}
         <div class="vote-stats">
           <span class="vote-stat">
@@ -127,13 +123,11 @@ function renderPolicyCard(policy) {
                   <span class="vote-count" data-role="downvote-btn-count">${policy.downvotes || 0}</span>
               </button>
           </div>
-          ${deviceHasVoted ? `<div class="vote-feedback"><small>✓ You've voted</small></div>` : '<div class="vote-feedback"></div>'}
+          ${deviceHasVoted ? `<div class="vote-feedback"><small>Voted</small></div>` : '<div class="vote-feedback"></div>'}
       </div>
     </div>
   `;
 }
-
-// --- Event Handlers ---
 
 function attachVoteHandlers() {
   policiesContainer.addEventListener('click', async (e) => {
@@ -147,37 +141,26 @@ function attachVoteHandlers() {
     const upvoteBtn = card.querySelector('.vote-btn.upvote');
     const downvoteBtn = card.querySelector('.vote-btn.downvote');
 
-    // Disable buttons immediately for good UX
     upvoteBtn.disabled = true;
     downvoteBtn.disabled = true;
 
     try {
-      // API call to record the vote
       await apiRequest('/votes', {
         method: 'POST',
         body: JSON.stringify({ policy_id: policyId, vote_type: voteType }),
       });
 
-      // Update UI directly instead of reloading everything
-      const countElement = card.querySelector(`[data-role="${voteType}-count"]`);
-      const buttonCountElement = card.querySelector(`[data-role="${voteType}-btn-count"]`);
-      const newCount = parseInt(countElement.textContent, 10) + 1;
-      
-      countElement.textContent = newCount;
-      buttonCountElement.textContent = newCount;
-      
-      card.querySelector('.vote-feedback').innerHTML = `<small>✓ Thanks for voting!</small>`;
+      card.querySelector('.vote-feedback').innerHTML = `<small>Vote recorded</small>`;
 
-      showTempAlert('<strong>Success!</strong> Your vote has been recorded.', 'success');
+      showTempAlert('Vote recorded', 'success');
 
       if (typeof plausible !== 'undefined') {
         plausible('Vote', { props: { type: voteType } });
       }
 
     } catch (error) {
-      showTempAlert(`<strong>Error:</strong> ${error.message}`, 'error', 5000);
+      showTempAlert(error.message, 'error', 5000);
       
-      // Re-enable buttons if the API call failed
       upvoteBtn.disabled = false;
       downvoteBtn.disabled = false;
     }
@@ -211,8 +194,6 @@ function setupFilterHandlers() {
   });
 }
 
-// --- Utility Functions ---
-
 function showTempAlert(message, type, duration = 3000) {
   alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
   setTimeout(() => {
@@ -227,7 +208,61 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// --- Initialize Page ---
+// Share functionality
+window.sharePolicy = function(policyId, title) {
+  const url = `${window.location.origin}/policy/${policyId}`;
+  
+  if (navigator.share) {
+    navigator.share({
+      title: title,
+      text: `Check out this policy: ${title}`,
+      url: url
+    }).then(() => {
+      if (typeof plausible !== 'undefined') {
+        plausible('Share Policy', { props: { method: 'native' } });
+      }
+    }).catch((error) => {
+      if (error.name !== 'AbortError') {
+        console.log('Share failed:', error);
+        copyToClipboard(url);
+        showTempAlert('Link copied to clipboard', 'success');
+      }
+    });
+  } else {
+    copyToClipboard(url);
+    showTempAlert('Link copied to clipboard', 'success');
+    
+    if (typeof plausible !== 'undefined') {
+      plausible('Share Policy', { props: { method: 'clipboard' } });
+    }
+  }
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {
+      fallbackCopyToClipboard(text);
+    });
+  } else {
+    fallbackCopyToClipboard(text);
+  }
+}
+
+function fallbackCopyToClipboard(text) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+  } catch (err) {
+    console.error('Failed to copy:', err);
+  }
+  document.body.removeChild(textarea);
+}
+
 loadCategories();
 loadPolicies();
 setupFilterHandlers();

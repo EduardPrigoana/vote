@@ -3,22 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vote - Superuser</title>
+  <title>Superuser</title>
   <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
   <link rel="stylesheet" href="/css/styles.css">
-  
-  <!-- Plausible Analytics -->
   <script defer data-domain="vote.prigoana.com" src="https://plausible.canine.tools/js/script.hash.outbound-links.pageview-props.tagged-events.js"></script>
   <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
 <body>
   <header>
     <div class="header-content">
-      <a href="/dashboard" class="logo">Vote Superuser</a>
+      <a href="/dashboard" class="logo">Vote Super</a>
       <nav>
         <a href="/dashboard">Policies</a>
         <a href="/admin">Admin</a>
         <a href="/superuser">Superuser</a>
+        <button id="theme-toggle" onclick="toggleTheme()"></button>
         <button class="logout-btn" onclick="logout()">Logout</button>
       </nav>
     </div>
@@ -27,27 +26,25 @@
   <main class="container">
     <div class="page-header">
       <h1>User Management</h1>
-      <p>Create and manage login codes for students, admins, and other superusers.</p>
+      <p>Create and manage login codes.</p>
     </div>
 
     <div id="alert-container"></div>
 
-    <!-- Create User Form -->
     <div class="card" style="margin-bottom: 2rem;">
-      <h2>Create New User</h2>
+      <h2>Create User</h2>
       <form id="create-user-form">
         <div class="grid grid-3">
           <div class="form-group">
-            <label for="login-code">Login Code</label>
+            <label for="login-code">Code</label>
             <input 
               type="text" 
               id="login-code" 
-              placeholder="e.g., CLASS2024" 
+              placeholder="CLASS2024" 
               required
               pattern="[A-Za-z0-9]+"
-              title="Only letters and numbers allowed"
+              title="Alphanumeric only"
             >
-            <small class="help-text">Alphanumeric only</small>
           </div>
 
           <div class="form-group">
@@ -68,15 +65,13 @@
           </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Create User</button>
+        <button type="submit" class="btn btn-primary">Create</button>
       </form>
     </div>
 
-    <!-- Users List -->
-    <div id="users-container" class="loading">Loading users...</div>
+    <div id="users-container" class="loading">Loading...</div>
   </main>
 
-  <!-- Edit User Modal -->
   <div id="edit-modal" style="display: none;">
     <div class="modal-content">
       <h3>Edit User</h3>
@@ -84,7 +79,7 @@
         <input type="hidden" id="edit-user-id">
         
         <div class="form-group">
-          <label for="edit-login-code">Login Code</label>
+          <label for="edit-login-code">Code</label>
           <input 
             type="text" 
             id="edit-login-code" 
@@ -112,32 +107,32 @@
 
         <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
           <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="submit" class="btn btn-primary">Save</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Delete Confirmation Modal -->
   <div id="delete-modal" style="display: none;">
     <div class="modal-content">
       <h3>Delete User?</h3>
       <p style="margin-bottom: 1rem; color: var(--muted-foreground);">
-        Are you sure you want to delete this user?
+        Delete this user?
       </p>
       <div style="background: var(--muted); padding: 1rem; border-radius: calc(var(--radius) - 2px); margin-bottom: 1rem;">
         <strong id="delete-user-code" style="color: var(--foreground);"></strong>
       </div>
       <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 1.5rem;">
-        This will delete all policies and votes submitted by this user.
+        Deletes all policies and votes.
       </p>
       <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
         <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-        <button class="btn btn-danger" id="confirm-delete-btn">Delete User</button>
+        <button class="btn btn-danger" id="confirm-delete-btn">Delete</button>
       </div>
     </div>
   </div>
 
+  <script src="/js/theme.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/superuser.js"></script>
 </body>

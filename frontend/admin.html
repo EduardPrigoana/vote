@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vote - Admin</title>
+  <title>Admin</title>
   <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
   <link rel="stylesheet" href="/css/styles.css">
   
-  <!-- Plausible Analytics -->
   <script defer data-domain="vote.prigoana.com" src="https://plausible.canine.tools/js/script.hash.outbound-links.pageview-props.tagged-events.js"></script>
   <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
@@ -19,6 +18,7 @@
         <a href="/dashboard">Policies</a>
         <a href="/admin">Admin</a>
         <a href="/superuser" id="superuser-link" style="display: none;">Superuser</a>
+        <button id="theme-toggle" onclick="toggleTheme()"></button>
         <button class="logout-btn" onclick="logout()">Logout</button>
       </nav>
     </div>
@@ -27,85 +27,80 @@
   <main class="container">
     <div class="page-header">
       <h1>Admin Dashboard</h1>
-      <p>Review and manage policy submissions from students.</p>
+      <p>Review and manage policies.</p>
     </div>
 
-    <!-- Tab Navigation -->
     <div style="border-bottom: 1px solid var(--border); margin-bottom: 2rem;">
       <div style="display: flex; gap: 1rem;">
         <button class="tab-btn active" data-tab="policies" onclick="switchTab('policies')">Policies</button>
         <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">Analytics</button>
-        <button class="tab-btn" data-tab="audit" onclick="switchTab('audit')">Audit Log</button>
+        <button class="tab-btn" data-tab="audit" onclick="switchTab('audit')">Audit</button>
       </div>
     </div>
 
-    <!-- Policies Tab -->
     <div id="policies-tab" class="tab-content">
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-value" id="stat-total">-</div>
-          <div class="stat-label">Total Policies</div>
+          <div class="stat-label">Total</div>
         </div>
         <div class="stat-card">
           <div class="stat-value" id="stat-pending">-</div>
-          <div class="stat-label">Pending Review</div>
+          <div class="stat-label">Pending</div>
         </div>
         <div class="stat-card">
           <div class="stat-value" id="stat-votes">-</div>
-          <div class="stat-label">Total Votes</div>
+          <div class="stat-label">Votes</div>
         </div>
         <div class="stat-card">
           <div class="stat-value" id="stat-students">-</div>
-          <div class="stat-label">Active Codes</div>
+          <div class="stat-label">Active</div>
         </div>
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
         <div style="display: flex; gap: 1rem; align-items: center;">
-          <label for="status-filter">Filter by Status</label>
+          <label for="status-filter">Filter</label>
           <select id="status-filter">
-            <option value="">All Policies</option>
-            <option value="pending" selected>Pending Review</option>
+            <option value="">All</option>
+            <option value="pending" selected>Pending</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
             <option value="uncertain">Uncertain</option>
             <option value="in_progress">In Progress</option>
             <option value="completed">Completed</option>
             <option value="on_hold">On Hold</option>
-            <option value="cannot_implement">Cannot Implement</option>
+            <option value="cannot_implement">Can't Do</option>
           </select>
         </div>
 
         <div style="display: flex; gap: 0.5rem;">
-          <button class="btn btn-secondary btn-sm" onclick="exportCSV()">Export CSV</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportExcel()">Export Excel</button>
-          <button class="btn btn-danger btn-sm" id="bulk-delete-btn" style="display: none;" onclick="bulkDelete()">Delete Selected</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportCSV()">CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportExcel()">Excel</button>
+          <button class="btn btn-danger btn-sm" id="bulk-delete-btn" style="display: none;" onclick="bulkDelete()">Delete</button>
         </div>
       </div>
 
       <div id="alert-container"></div>
-      <div id="policies-container" class="loading">Loading policies...</div>
+      <div id="policies-container" class="loading">Loading...</div>
     </div>
 
-    <!-- Analytics Tab -->
     <div id="analytics-tab" class="tab-content" style="display: none;">
-      <div id="analytics-container" class="loading">Loading analytics...</div>
+      <div id="analytics-container" class="loading">Loading...</div>
     </div>
 
-    <!-- Audit Log Tab -->
     <div id="audit-tab" class="tab-content" style="display: none;">
-      <div id="audit-container" class="loading">Loading audit log...</div>
+      <div id="audit-container" class="loading">Loading...</div>
     </div>
   </main>
 
-  <!-- Update Status/Comment Modal -->
   <div id="modal" style="display: none;">
     <div class="modal-content">
       <h3 id="modal-title">Update Policy</h3>
       <div class="form-group">
-        <label for="admin-comment">Admin Comment (Optional)</label>
-        <textarea id="admin-comment" rows="4" placeholder="Add context or feedback for students..."></textarea>
-        <small class="help-text">This will be visible to all students</small>
+        <label for="admin-comment">Comment (Optional)</label>
+        <textarea id="admin-comment" rows="4" placeholder="Add feedback..."></textarea>
+        <small class="help-text">Visible to all students</small>
       </div>
       <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
         <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -114,26 +109,67 @@
     </div>
   </div>
 
-  <!-- Delete Confirmation Modal -->
+  <div id="edit-modal" style="display: none;">
+    <div class="modal-content">
+      <h3>Edit Policy</h3>
+      <form id="edit-policy-form">
+        <div class="form-group">
+          <label for="edit-policy-title">Title</label>
+          <input 
+            type="text" 
+            id="edit-policy-title" 
+            minlength="10"
+            maxlength="200"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="edit-policy-category">Category</label>
+          <select id="edit-policy-category">
+            <option value="">Select category...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-policy-description">Description</label>
+          <textarea 
+            id="edit-policy-description" 
+            rows="6"
+            minlength="50"
+            maxlength="2000"
+            required
+          ></textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="delete-modal" style="display: none;">
     <div class="modal-content">
       <h3>Delete Policy?</h3>
       <p style="margin-bottom: 1rem; color: var(--muted-foreground);">
-        Are you sure you want to permanently delete this policy?
+        Permanently delete this policy?
       </p>
       <div style="background: var(--muted); padding: 1rem; border-radius: calc(var(--radius) - 2px); margin-bottom: 1rem;">
         <strong id="delete-policy-title" style="color: var(--foreground);"></strong>
       </div>
       <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-bottom: 1.5rem;">
-        This action cannot be undone. All votes will also be deleted.
+        This cannot be undone.
       </p>
       <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
         <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-        <button class="btn btn-danger" id="confirm-delete-btn">Delete Policy</button>
+        <button class="btn btn-danger" id="confirm-delete-btn">Delete</button>
       </div>
     </div>
   </div>
 
+  <script src="/js/theme.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/admin.js"></script>
 </body>

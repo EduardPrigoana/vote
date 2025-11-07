@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vote - Submit Policy</title>
+  <title>Submit Policy</title>
   <link rel="icon" type="image/png" href="https://prigoana.com/favicon.png">
   <link rel="stylesheet" href="/css/styles.css">
   
-  <!-- Plausible Analytics -->
   <script defer data-domain="vote.prigoana.com" src="https://plausible.canine.tools/js/script.hash.outbound-links.pageview-props.tagged-events.js"></script>
   <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
 </head>
@@ -20,6 +19,7 @@
         <a href="/submit">Submit</a>
         <a href="/admin" id="admin-link" style="display: none;">Admin</a>
         <a href="/superuser" id="superuser-link" style="display: none;">Superuser</a>
+        <button id="theme-toggle" onclick="toggleTheme()"></button>
         <button class="logout-btn" onclick="logout()">Logout</button>
       </nav>
     </div>
@@ -28,12 +28,12 @@
   <main class="container">
     <div style="max-width: 600px; margin: 0 auto;">
       <div class="page-header">
-        <h1>Submit a Policy</h1>
-        <p>Share your idea to improve our school. Admins will review it before it goes live.</p>
+        <h1>Submit Policy</h1>
+        <p>Share your idea.</p>
       </div>
 
       <div class="alert alert-warning">
-        <strong>Important:</strong> Policies must be approved by school administration and the board. The Student Union will advocate for approved proposals.
+        <strong>Note:</strong> Policies must be approved by school administration and the board. The Student Union will advocate for approved proposals.
       </div>
 
       <div id="alert-container"></div>
@@ -41,44 +41,43 @@
       <div class="card">
         <form id="policy-form">
           <div class="form-group">
-            <label for="title">Policy Title</label>
+            <label for="title">Title</label>
             <input 
               type="text" 
               id="title" 
               name="title" 
-              placeholder="e.g., Add More Outdoor Seating Areas"
+              placeholder="Add Outdoor Seating"
               minlength="10"
               maxlength="200"
               required
             >
-            <small class="help-text">Be clear and concise (10-200 characters)</small>
+            <small class="help-text">Clear and concise (10-200 chars)</small>
             <div id="title-counter" class="help-text" style="text-align: right; margin-top: 0.25rem;">0/200</div>
           </div>
 
           <div class="form-group">
             <label for="category">Category (Optional)</label>
             <select id="category" name="category">
-              <option value="">Select a category...</option>
+              <option value="">Select...</option>
             </select>
-            <small class="help-text">Help others find your policy</small>
           </div>
 
           <div class="form-group">
-            <label for="description">Detailed Description</label>
+            <label for="description">Description</label>
             <textarea 
               id="description" 
               name="description" 
-              placeholder="Explain your policy idea, why it matters, and how it could be implemented..."
+              placeholder="Explain your idea..."
               minlength="50"
               maxlength="2000"
               required
             ></textarea>
-            <small class="help-text">Provide details and reasoning (50-2000 characters)</small>
+            <small class="help-text">Details and reasoning (50-2000 chars)</small>
             <div id="description-counter" class="help-text" style="text-align: right; margin-top: 0.25rem;">0/2000</div>
           </div>
 
           <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-            <button type="submit" class="btn btn-primary">Submit Policy</button>
+            <button type="submit" class="btn btn-primary">Submit</button>
             <a href="/dashboard" class="btn btn-secondary">Cancel</a>
           </div>
         </form>
@@ -86,6 +85,9 @@
     </div>
   </main>
 
+  <div id="draft-indicator"></div>
+
+  <script src="/js/theme.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/submit.js"></script>
 </body>

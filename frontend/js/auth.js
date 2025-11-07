@@ -1,4 +1,3 @@
-// Authentication utilities
 const AUTH_TOKEN_KEY = 'auth_token';
 const USER_ROLE_KEY = 'user_role';
 const USER_ID_KEY = 'user_id';
@@ -70,7 +69,6 @@ function requireSuperuser() {
   return true;
 }
 
-// Generate or get device fingerprint
 function getDeviceFingerprint() {
   let fingerprint = localStorage.getItem(DEVICE_ID_KEY);
   
@@ -91,7 +89,6 @@ function getDeviceFingerprint() {
   return fingerprint;
 }
 
-// API helper
 async function apiRequest(endpoint, options = {}) {
   const token = getAuthToken();
   const headers = {
